@@ -5,36 +5,35 @@ import 'package:drift/drift.dart' as drift;
 import '../database.dart';
 import '../painters/board_painter.dart';
 import 'result_page.dart';
+import 'history_page.dart';
+import 'settings_page.dart';
 import '../utils/score_engine.dart'; 
-import 'package:flutter/gestures.dart'; // マウスホイール用
+import 'package:flutter/gestures.dart'; 
 
-// ★1. データ構造の定義（この位置が正しい）
+// データ構造
 class ThrowData {
   final Offset positionMm;
   final int score;
   final String label;
-
   ThrowData(this.positionMm, this.score, this.label);
 }
 
 class PrecisionInputPage extends StatefulWidget {
-  const PrecisionInputPage({super.key});
+  final int gameMode;
+  const PrecisionInputPage({super.key, this.gameMode = 0});
 
   @override
   State<PrecisionInputPage> createState() => _PrecisionInputPageState();
 }
 
 class _PrecisionInputPageState extends State<PrecisionInputPage> {
-  // --- 状態変数定義 (重複を排除し、一つに統合) ---
-  
-  // キャリブレーションとモード
+  // --- 状態変数 ---
   double visibleDiameterMm = 160.0;
   double ringSizeMm = 63.0;
   double ringLargeMm = 83.0;
   double ringHalfTripleMm = 107.0;
-  int _scoringMode = 0; 
+  late int _scoringMode; 
   
-  // スコア設定
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
@@ -43,27 +42,24 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   int _scoreArea = 0;
   double _outBoundaryMm = 340.0;
 
-  // ゲームデータ管理
-  final List<ThrowData> _throwsData = [];      // 現在の投擲データ (ロジック用)
-  final List<Offset> _throwsMm = [];           // Painter用 (座標のみ)
-  final List<int> _throwScores = [];           // UI表示用 (点数のみ)
-  final List<ThrowData> _gameHistoryData = [];  // 過去のラウンドの投擲データ
+  final List<ThrowData> _throwsData = []; 
+  final List<Offset> _throwsMm = []; 
+  final List<int> _throwScores = [];
+  final List<ThrowData> _gameHistoryData = []; 
 
-  // ゲーム進行
   int _currentScore = 0;
   int _roundCount = 1;
   static const int maxRounds = 8;
   String _lastHitLabel = "";
-
-  // ズーム操作用の一時変数
+  
   double _baseVisibleDiameter = 160.0; 
   static const double minZoomMm = 160.0; 
   static const double maxZoomMm = 400.0; 
 
-
   @override
   void initState() {
     super.initState();
+    _scoringMode = widget.gameMode;
     _loadSettings();
   }
 
@@ -80,7 +76,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _scoreLarge = prefs.getInt('score_large') ?? 2;
       _scoreHalfTriple = prefs.getInt('score_half_triple') ?? 1;
       _scoreArea = prefs.getInt('score_area') ?? 0;
-      _scoringMode = prefs.getInt('scoring_mode') ?? 0;
       
       int boundaryType = prefs.getInt('boundary_type') ?? 0;
       switch (boundaryType) {
@@ -89,7 +84,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         case 2: _outBoundaryMm = ringHalfTripleMm; break;
         default: _outBoundaryMm = 340.0;
       }
-      
       _baseVisibleDiameter = visibleDiameterMm;
     });
   }
@@ -98,7 +92,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     if (distanceMm > _outBoundaryMm / 2) return 0;
     if (distanceMm <= 8.0) return _scoreInner;
     if (distanceMm <= 22.0) return _scoreOuter;
-    if (distanceMm <= ringSizeMm / 2) return _scoreSmall;
+    if (distanceMm <= ringSizeMm / 2) return _scoreSmall; 
     if (distanceMm <= ringLargeMm / 2) return _scoreLarge;
     if (distanceMm <= ringHalfTripleMm / 2) return _scoreHalfTriple;
     return _scoreArea;
@@ -115,7 +109,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     if (event is PointerScrollEvent) {
       double sensitivity = 0.5;
       double delta = event.scrollDelta.dy;
-      
       setState(() {
         double newVisibleDiameter = visibleDiameterMm + delta * sensitivity;
         visibleDiameterMm = newVisibleDiameter.clamp(minZoomMm, maxZoomMm);
@@ -124,20 +117,27 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     }
   }
 
-
-  void _handleTap(TapUpDetails details, double boardSizePx) {
+  // ★修正: タップ処理を画面全体座標に対応
+  void _handleTap(TapUpDetails details, BoxConstraints constraints, double boardSizePx) {
     if (_throwsMm.length >= 3) return;
 
-    final double centerX = boardSizePx / 2;
-    final double centerY = boardSizePx / 2;
+    // 画面(LayoutBuilder)の中心座標
+    final double centerX = constraints.maxWidth / 2;
+    final double centerY = constraints.maxHeight / 2;
+    
+    // タップ位置
     final Offset localPos = details.localPosition;
 
+    // 中心からの相対座標 (ピクセル)
     final Offset relativePx = Offset(
       localPos.dx - centerX,
       localPos.dy - centerY,
     );
 
+    // 拡大率の計算 (boardSizePx は CustomPaint のサイズ = 基準となる正方形の1辺)
     double scale = visibleDiameterMm / boardSizePx;
+    
+    // mm単位に変換
     Offset posMm = relativePx * scale;
     double distanceMm = posMm.distance;
 
@@ -165,7 +165,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   void _nextRound() {
     _gameHistoryData.addAll(_throwsData); 
-
     setState(() {
       if (_roundCount < maxRounds) {
         _roundCount++;
@@ -174,7 +173,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         _throwScores.clear();
         _lastHitLabel = ""; 
       } else {
-        // ゲーム終了後の処理
         double sumX = 0, sumY = 0;
         for (var p in _gameHistoryData) { sumX += p.positionMm.dx; sumY += p.positionMm.dy; }
         double meanX = sumX / _gameHistoryData.length;
@@ -235,7 +233,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
             x: p.positionMm.dx, 
             y: p.positionMm.dy, 
             orderIndex: i,
-            segmentLabel: drift.Value(p.label), // ★修正済み
+            segmentLabel: drift.Value(p.label),
           ),
         );
       }
@@ -259,108 +257,166 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   @override
   Widget build(BuildContext context) {
+    String title = _scoringMode == 0 ? 'Center Count-Up' : 'Count-Up';
+    
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: const Text('Bull Master - Practice'),
+        title: Text(title),
+        backgroundColor: Colors.black.withOpacity(0.8),
+        elevation: 0,
         actions: const [],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Column(
-                children: [
-                  Text("ROUND $_roundCount / $maxRounds", style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 5),
+        child: Stack(
+          children: [
+            // --- Layer 1: ダーツボード (最背面) ---
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  double availableSize = min(constraints.maxWidth, constraints.maxHeight);
                   
-                  Text("Total Score", style: TextStyle(color: Colors.grey[400], fontSize: 14)),
-                  Text("$_currentScore", style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, height: 1.0)),
-                  
-                  const SizedBox(height: 5),
-
-                  Text(
-                    _lastHitLabel.isEmpty ? "Ready" : "HIT: $_lastHitLabel",
-                    style: const TextStyle(fontSize: 24, color: Colors.cyanAccent, fontWeight: FontWeight.bold, letterSpacing: 2.0),
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
-                      String scoreText = index < _throwScores.length ? "${_throwScores[index]}" : "-";
-                      bool isCurrent = index == _throwScores.length;
+                  return Listener( // ★修正: Listenerを最上位へ
+                    onPointerSignal: _handleScrollZoom,
+                    child: GestureDetector( // ★修正: GestureDetectorを最上位へ
+                      behavior: HitTestBehavior.translucent, // 透明部分もタップ可能に
+                      onScaleStart: (details) {
+                        _baseVisibleDiameter = visibleDiameterMm;
+                      },
+                      onScaleUpdate: (details) {
+                        if (details.scale != 1.0) {
+                          _handleZoomUpdate(details.scale);
+                        }
+                      },
+                      // ★修正: constraintsを渡す
+                      onTapUp: (details) => _handleTap(details, constraints, availableSize),
                       
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ClipRect(
                         child: Container(
-                          width: 50, height: 50,
-                          decoration: BoxDecoration(
-                            color: isCurrent ? Colors.blueGrey[800] : Colors.grey[900],
-                            border: Border.all(color: isCurrent ? Colors.blueAccent : Colors.transparent, width: 2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(scoreText, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    double availableSize = min(constraints.maxWidth, constraints.maxHeight);
-                    
-                    return Center(
-                      child: Listener( 
-                        onPointerSignal: _handleScrollZoom,
-                        child: GestureDetector( 
-                          onScaleStart: (details) {
-                            _baseVisibleDiameter = visibleDiameterMm;
-                          },
-                          onScaleUpdate: (details) {
-                            if (details.scale != 1.0) {
-                              _handleZoomUpdate(details.scale);
-                            }
-                          },
-                          onTapUp: (details) => _handleTap(details, availableSize),
-                          child: CustomPaint(
-                            size: Size(availableSize, availableSize),
-                            painter: BoardPainter(
-                              throwsMm: _throwsMm,
-                              visibleDiameterMm: visibleDiameterMm,
-                              ringSizeMm: ringSizeMm,
-                              ringLargeMm: ringLargeMm,
-                              ringHalfTripleMm: ringHalfTripleMm,
+                          color: Colors.transparent, // タップ判定用
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          child: Center(
+                            child: CustomPaint(
+                              size: Size(availableSize, availableSize),
+                              painter: BoardPainter(
+                                throwsMm: _throwsMm,
+                                visibleDiameterMm: visibleDiameterMm,
+                                ringSizeMm: ringSizeMm,
+                                ringLargeMm: ringLargeMm,
+                                ringHalfTripleMm: ringHalfTripleMm,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // --- Layer 2: スコア情報 (IgnorePointerでタップを透過) ---
+            Positioned(
+              top: 10, left: 20, right: 20,
+              child: IgnorePointer(
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "ROUND $_roundCount / $maxRounds",
+                          style: const TextStyle(
+                            color: Colors.amber, 
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
+                          )
+                        ),
+                        Text(
+                          "Total: $_currentScore",
+                          style: const TextStyle(
+                            fontSize: 24, 
+                            fontWeight: FontWeight.w900,
+                            shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
+                          )
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      _lastHitLabel.isEmpty ? "READY" : "HIT: $_lastHitLabel",
+                      style: TextStyle(
+                        fontSize: 32, 
+                        color: _lastHitLabel.contains("OUT") ? Colors.redAccent : Colors.cyanAccent, 
+                        fontWeight: FontWeight.w900, 
+                        letterSpacing: 2.0,
+                        shadows: const [
+                          Shadow(blurRadius: 10.0, color: Colors.black, offset: Offset(0, 0)),
+                          Shadow(blurRadius: 2.0, color: Colors.black, offset: Offset(2, 2))
+                        ]
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        String scoreText = index < _throwScores.length ? "${_throwScores[index]}" : "-";
+                        bool isCurrent = index == _throwScores.length;
+                        
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0), 
+                          child: Container(
+                            width: 44, height: 44, 
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5), 
+                              border: Border.all(
+                                color: isCurrent ? Colors.blueAccent : Colors.white30, 
+                                width: 2
+                              ),
+                              borderRadius: BorderRadius.circular(50),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              scoreText, 
+                              style: const TextStyle(
+                                fontSize: 18, 
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white
+                              )
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
+            ),
 
-              SizedBox(
+            // --- Layer 3: アクションボタン ---
+            Positioned(
+              bottom: 20, left: 20, right: 20,
+              child: SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: _throwsMm.length == 3 ? _nextRound : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _roundCount == maxRounds ? Colors.redAccent : Colors.blueAccent,
-                    disabledBackgroundColor: Colors.grey[800],
+                    disabledBackgroundColor: Colors.grey[800]!.withOpacity(0.8),
+                    elevation: 8,
+                    shadowColor: Colors.black.withOpacity(0.5),
                   ),
-                  child: Text(_roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  child: Text(
+                    _roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", 
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

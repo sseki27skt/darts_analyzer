@@ -1,18 +1,19 @@
-// lib/screens/settings_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drift/drift.dart' as drift; 
+import 'package:flutter/services.dart'; 
+import 'dart:convert';
+import 'dart:math';
+import '../database.dart';
 
 class SettingsPage extends StatefulWidget {
   final double currentRingSizeMm;
   final double currentRingLargeMm;
-  // ★削除: currentVisibleMm は不要
 
   const SettingsPage({
     super.key, 
     required this.currentRingSizeMm, 
     required this.currentRingLargeMm, 
-    // ★削除
   });
 
   @override
@@ -20,22 +21,26 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // --- 状態変数定義をここに集中させる ---
+  // --- 状態変数定義 ---
   late double _ringSizeMm;
   late double _ringLargeMm;
-  // ★削除: _visibleMm は不要
-
-  // ... (他のスコア設定変数, _scoringMode などはそのまま) ...
+  
+  // キャリブレーションとモード
   double _ringHalfTripleMm = 107.0; 
   int _scoreInner = 5;
-  // ...
+  int _scoreOuter = 4;
+  int _scoreSmall = 3;
+  int _scoreLarge = 2;
+  int _scoreHalfTriple = 1;
+  int _scoreArea = 0;
+  int _boundaryType = 0; 
+  // ---
 
   @override
   void initState() {
     super.initState();
     _ringSizeMm = widget.currentRingSizeMm;
     _ringLargeMm = widget.currentRingLargeMm;
-    // ★削除: _visibleMm の初期化は不要
     _loadSettings();
   }
 
@@ -44,12 +49,16 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       _ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
-      // ★削除: visibleDiameterMm のロードは不要
 
-      // ... (スコア設定のロードはそのまま) ...
       _ringHalfTripleMm = prefs.getDouble('ring_half_triple_mm') ?? 107.0;
+
       _scoreInner = prefs.getInt('score_inner') ?? 5;
-      // ...
+      _scoreOuter = prefs.getInt('score_outer') ?? 4;
+      _scoreSmall = prefs.getInt('score_small') ?? 3;
+      _scoreLarge = prefs.getInt('score_large') ?? 2;
+      _scoreHalfTriple = prefs.getInt('score_half_triple') ?? 1;
+      _scoreArea = prefs.getInt('score_area') ?? 0;
+      _boundaryType = prefs.getInt('boundary_type') ?? 0; 
     });
   }
 
@@ -57,24 +66,273 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('ring_size_mm', _ringSizeMm);
     await prefs.setDouble('ring_large_mm', _ringLargeMm);
-    // ★削除: 'visible_mm' の保存は不要
     
-    // ... (他のスコア設定の保存はそのまま) ...
     await prefs.setDouble('ring_half_triple_mm', _ringHalfTripleMm);
+
     await prefs.setInt('score_inner', _scoreInner);
-    // ...
+    await prefs.setInt('score_outer', _scoreOuter);
+    await prefs.setInt('score_small', _scoreSmall);
+    await prefs.setInt('score_large', _scoreLarge);
+    await prefs.setInt('score_half_triple', _scoreHalfTriple);
+    await prefs.setInt('score_area', _scoreArea);
+    await prefs.setInt('boundary_type', _boundaryType);
 
     if (mounted) {
       Navigator.of(context).pop({
         'ring': _ringSizeMm,
         'ringLarge': _ringLargeMm,
-        // ★削除: 'visible' は不要
         'needsReload': true, 
       });
     }
   }
 
-  // ... (build メソッド内で Slider を削除) ...
+  // ----------------------------------------
+  // ★★★ データ管理ロジック (修正版) ★★★
+  // ----------------------------------------
+
+  Future<void> _exportData() async {
+    try {
+      final allGames = await database.select(database.games).get();
+      final allThrows = await database.select(database.throws).get();
+
+      final Map<int, List<Map<String, dynamic>>> throwsByGame = {};
+      for (var t in allThrows) {
+        if (!throwsByGame.containsKey(t.gameId)) {
+          throwsByGame[t.gameId] = [];
+        }
+        throwsByGame[t.gameId]!.add({
+          'x': t.x,
+          'y': t.y,
+          'orderIndex': t.orderIndex,
+          // ★追加: ラベル情報もエクスポート
+          'segmentLabel': t.segmentLabel,
+        });
+      }
+
+      final List<Map<String, dynamic>> exportList = [];
+      for (var game in allGames) {
+        exportList.add({
+          'meta': {
+            'date': game.date.toIso8601String(),
+            'score': game.score,
+            'meanX': game.meanX,
+            'meanY': game.meanY,
+            'sdX': game.sdX,
+            'sdY': game.sdY,
+            'ringSizeMm': game.ringSizeMm,
+            'ringLargeMm': game.ringLargeMm,
+          },
+          'points': throwsByGame[game.id] ?? [],
+        });
+      }
+
+      final jsonString = jsonEncode(exportList);
+      await Clipboard.setData(ClipboardData(text: jsonString));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Exported ${exportList.length} games to Clipboard!")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Export Failed: $e")));
+      }
+    }
+  }
+
+  Future<void> _importData() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Import Data (DB)"),
+        content: const Text(
+          "Warning: This will DELETE all current data.\nAre you sure?",
+          style: TextStyle(color: Colors.redAccent),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text("Overwrite", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text == null || data!.text!.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Clipboard is empty")));
+      return;
+    }
+
+    try {
+      final List<dynamic> jsonList = jsonDecode(data.text!);
+      
+      await database.transaction(() async {
+        await database.delete(database.throws).go();
+        await database.delete(database.games).go();
+
+        for (final item in jsonList) {
+          final Map<String, dynamic> meta = item['meta'];
+          final List<dynamic> points = item['points'];
+
+          final gameId = await database.into(database.games).insert(GamesCompanion.insert(
+            date: DateTime.parse(meta['date']),
+            score: meta['score'],
+            meanX: (meta['meanX'] as num).toDouble(),
+            meanY: (meta['meanY'] as num).toDouble(),
+            sdX: (meta['sdX'] as num).toDouble(),
+            sdY: (meta['sdY'] as num).toDouble(),
+            ringSizeMm: (meta['ringSizeMm'] as num).toDouble(),
+            ringLargeMm: (meta['ringLargeMm'] as num?)?.toDouble() ?? 83.0,
+          ));
+
+          for (final p in points) {
+            await database.into(database.throws).insert(ThrowsCompanion.insert(
+              gameId: gameId,
+              x: (p['x'] as num).toDouble(),
+              y: (p['y'] as num).toDouble(),
+              orderIndex: p['orderIndex'],
+              // ★追加: ラベル情報を復元 (ない場合は空文字)
+              segmentLabel: drift.Value(p['segmentLabel'] ?? ''),
+            ));
+          }
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Import Successful! Please restart app.")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Import Failed: $e")));
+      }
+    }
+  }
+
+  Future<void> _generateDummyData() async {
+    final random = Random();
+    final now = DateTime.now();
+    
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Generate Dummy Data"),
+        content: const Text("This will add 30 fake game records with plots.\nAre you sure?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Generate", style: TextStyle(color: Colors.orangeAccent))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await database.transaction(() async {
+      for (int i = 30; i >= 0; i--) {
+        final date = now.subtract(Duration(days: i, hours: random.nextInt(12)));
+        final score = 40 + random.nextInt(61);
+        final spread = 40.0 - (i * 0.8);
+        
+        final List<Offset> dummyPoints = [];
+        double sumX = 0, sumY = 0;
+        for(int j=0; j<3; j++) {
+          double u = 0, v = 0;
+          while(u == 0) u = random.nextDouble(); 
+          while(v == 0) v = random.nextDouble();
+          double mag = sqrt(-2.0 * log(u)) * (spread / 2);
+          double x = mag * cos(2.0 * pi * v);
+          double y = mag * sin(2.0 * pi * v);
+          dummyPoints.add(Offset(x, y));
+          sumX += x;
+          sumY += y;
+        }
+        
+        double meanX = sumX / 3;
+        double meanY = sumY / 3;
+        double sumSqX = 0, sumSqY = 0;
+        for(var p in dummyPoints) {
+          sumSqX += pow(p.dx - meanX, 2);
+          sumSqY += pow(p.dy - meanY, 2);
+        }
+        double sdX = sqrt(sumSqX / 3);
+        double sdY = sqrt(sumSqY / 3);
+
+        final gameId = await database.into(database.games).insert(GamesCompanion.insert(
+          date: date,
+          score: score,
+          meanX: meanX,
+          meanY: meanY,
+          sdX: sdX,
+          sdY: sdY,
+          ringSizeMm: _ringSizeMm,
+          ringLargeMm: _ringLargeMm,
+        ));
+
+        for(int j=0; j<3; j++) {
+           await database.into(database.throws).insert(ThrowsCompanion.insert(
+            gameId: gameId,
+            x: dummyPoints[j].dx,
+            y: dummyPoints[j].dy,
+            orderIndex: j,
+            // ★追加: ダミーデータにもラベルを入れる
+            segmentLabel: drift.Value("DEBUG"), 
+          ));
+        }
+      }
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Generated 30 dummy records!")));
+    }
+  }
+
+  Future<void> _clearDatabase() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Reset Database"),
+        content: const Text("DELETE ALL DATA. Are you sure?", style: TextStyle(color: Colors.redAccent)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("DELETE ALL", style: TextStyle(color: Colors.redAccent))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await database.transaction(() async {
+      await database.delete(database.throws).go();
+      await database.delete(database.games).go();
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Database Cleared!")));
+    }
+  }
+  
+  Widget _buildScoreInput(String label, int value, Function(int) onChanged) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label),
+        Row(
+          children: [
+            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () { if (value > 0) setState(() => onChanged(value - 1)); }),
+            Text("$value", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () { if (value < 100) setState(() => onChanged(value + 1)); }),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,9 +343,17 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ... (Scoring Rules Section) ...
+              const Text("Scoring Rules (Center Mode)", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber)),
+              
+              _buildScoreInput("Inner Bull (< 8mm)", _scoreInner, (v) => _scoreInner = v),
+              _buildScoreInput("Outer Bull (< 22mm)", _scoreOuter, (v) => _scoreOuter = v),
+              _buildScoreInput("Small Ring", _scoreSmall, (v) => _scoreSmall = v),
+              _buildScoreInput("Large Ring", _scoreLarge, (v) => _scoreLarge = v),
+              _buildScoreInput("Half-Triple Ring", _scoreHalfTriple, (v) => _scoreHalfTriple = v),
+              _buildScoreInput("Other Valid Area", _scoreArea, (v) => _scoreArea = v),
 
               const Divider(height: 40, thickness: 1, color: Colors.white24),
+
 
               const Text("Calibration", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
@@ -101,14 +367,42 @@ class _SettingsPageState extends State<SettingsPage> {
               Text("Half-Triple Ring: ${_ringHalfTripleMm.toStringAsFixed(1)} mm"),
               Slider(value: _ringHalfTripleMm, min: 80.0, max: 220.0, divisions: 140, label: "${_ringHalfTripleMm.toStringAsFixed(1)} mm", activeColor: Colors.cyanAccent, onChanged: (val) => setState(() => _ringHalfTripleMm = val)),
               
-              // ★削除: Zoomスライダーは不要
-              // Text("Zoom: ..."),
-              // Slider(...)
-
               const Divider(height: 40, thickness: 1, color: Colors.white24),
-              
-              // ... (Data Management Section) ...
-              
+
+              const Text("Data Management", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+              const SizedBox(height: 10),
+
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.science),
+                  label: const Text("Generate Dummy Data (Debug)"),
+                  onPressed: _generateDummyData,
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.orangeAccent),
+                ),
+              ),
+
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.copy), label: const Text("Export DB"), onPressed: _exportData)),
+                  const SizedBox(width: 10),
+                  Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.paste), label: const Text("Import DB"), onPressed: _importData, style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent))),
+                ],
+              ),
+              const Text("※Export: Copy JSON to clipboard.\n※Import: Paste JSON from clipboard.", style: TextStyle(color: Colors.grey, fontSize: 11)),
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.delete_forever),
+                  label: const Text("Reset Database"),
+                  onPressed: _clearDatabase,
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
+                ),
+              ),
+
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity, height: 50,
@@ -124,22 +418,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildScoreInput(String label, int value, Function(int) onChanged) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label),
-        Row(
-          children: [
-            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () { if (value > 0) setState(() => onChanged(value - 1)); }),
-            Text("$value", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () { if (value < 100) setState(() => onChanged(value + 1)); }),
-          ],
-        ),
-      ],
     );
   }
 }

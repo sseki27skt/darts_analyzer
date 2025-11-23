@@ -7,16 +7,16 @@ class BoardPainter extends CustomPainter {
   final double ringSizeMm;
   final double ringLargeMm;
   final double ringHalfTripleMm; 
+  
   final double? cepMm; 
   final Offset? centroidMm;
-  // ...
 
   BoardPainter({
     required this.throwsMm,
     required this.visibleDiameterMm,
     required this.ringSizeMm,
     required this.ringLargeMm,
-    this.ringHalfTripleMm = 107.0, // ★デフォルト値のまま維持
+    this.ringHalfTripleMm = 107.0, 
     this.cepMm,
     this.centroidMm,
   });
@@ -82,7 +82,7 @@ class BoardPainter extends CustomPainter {
     ringPaint.strokeWidth = 1.0;
     canvas.drawCircle(center, (ringLargeMm / 2) * scalePxPerMm, ringPaint);
     
-    // ★追加: Ring Half-Triple (Cyanで少し目立たせる)
+    // Half-Triple Ring (Cyanで少し目立たせる)
     ringPaint.color = Colors.cyanAccent.withOpacity(0.4); 
     ringPaint.strokeWidth = 1.0;
     canvas.drawCircle(center, (ringHalfTripleMm / 2) * scalePxPerMm, ringPaint);
@@ -92,7 +92,6 @@ class BoardPainter extends CustomPainter {
     ringPaint.strokeWidth = 1.5;
     canvas.drawCircle(center, (ringSizeMm / 2) * scalePxPerMm, ringPaint);
 
-    // ... (以下、ブルエリアなどは変更なし) ...
     final Paint fillPaint = Paint()..style = PaintingStyle.fill;
     fillPaint.color = const Color(0xFF661010);
     canvas.drawCircle(center, rBullOut * scalePxPerMm, fillPaint);
@@ -124,8 +123,7 @@ class BoardPainter extends CustomPainter {
       canvas.drawCircle(drawPos, 4, pointStroke);
     }
   }
-  
-  // ... (_drawBits, _drawBitsCircle はそのまま)
+
   void _drawBits(Canvas canvas, Offset center, double startAngle, double sweepAngle, double rInnerPx, double rOuterPx, Color baseColor) {
      final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withOpacity(0.5);
     final Paint bitPaint = Paint()..color = bitColor..style = PaintingStyle.fill;
@@ -170,7 +168,7 @@ class BoardPainter extends CustomPainter {
            oldDelegate.visibleDiameterMm != visibleDiameterMm ||
            oldDelegate.ringSizeMm != ringSizeMm ||
            oldDelegate.ringLargeMm != ringLargeMm ||
-           oldDelegate.ringHalfTripleMm != ringHalfTripleMm || // ★追加
+           oldDelegate.ringHalfTripleMm != ringHalfTripleMm ||
            oldDelegate.cepMm != cepMm ||
            oldDelegate.centroidMm != centroidMm;
   }
