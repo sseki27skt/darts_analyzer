@@ -83,7 +83,7 @@ class BoardPainter extends CustomPainter {
     canvas.drawCircle(center, (ringLargeMm / 2) * scalePxPerMm, ringPaint);
     
     // Half-Triple Ring (Cyanで少し目立たせる)
-    ringPaint.color = Colors.cyanAccent.withOpacity(0.4); 
+    ringPaint.color = Colors.cyanAccent.withValues(alpha: 0.4); 
     ringPaint.strokeWidth = 1.0;
     canvas.drawCircle(center, (ringHalfTripleMm / 2) * scalePxPerMm, ringPaint);
 
@@ -105,7 +105,7 @@ class BoardPainter extends CustomPainter {
 
     if (cepMm != null && centroidMm != null) {
       Offset cPos = center + (centroidMm! * scalePxPerMm);
-      final Paint cepPaint = Paint()..style = PaintingStyle.fill..color = Colors.greenAccent.withOpacity(0.2);
+      final Paint cepPaint = Paint()..style = PaintingStyle.fill..color = Colors.greenAccent.withValues(alpha: 0.2);
       canvas.drawCircle(cPos, cepMm! * scalePxPerMm, cepPaint);
       cepPaint..style = PaintingStyle.stroke..color = Colors.greenAccent..strokeWidth = 1.5;
       canvas.drawCircle(cPos, cepMm! * scalePxPerMm, cepPaint);
@@ -125,7 +125,7 @@ class BoardPainter extends CustomPainter {
   }
 
   void _drawBits(Canvas canvas, Offset center, double startAngle, double sweepAngle, double rInnerPx, double rOuterPx, Color baseColor) {
-     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withOpacity(0.5);
+     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withValues(alpha: 0.5);
     final Paint bitPaint = Paint()..color = bitColor..style = PaintingStyle.fill;
     const double bitRadiusPx = 1.5; 
     const double rStepPx = 5.0;
@@ -144,7 +144,7 @@ class BoardPainter extends CustomPainter {
   }
 
   void _drawBitsCircle(Canvas canvas, Offset center, double rInnerPx, double rOuterPx, Color baseColor) {
-     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withOpacity(0.5);
+     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!. withValues(alpha: 0.5);
     final Paint bitPaint = Paint()..color = bitColor..style = PaintingStyle.fill;
     const double bitRadiusPx = 1.5;
     const double rStepPx = 5.0;

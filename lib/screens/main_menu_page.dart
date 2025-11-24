@@ -79,7 +79,7 @@ class GameSelectionPage extends StatelessWidget {
   Widget _buildGameButton(BuildContext context, {required String title, required String subtitle, required Widget? destination, required Color color}) {
     return ElevatedButton(
       onPressed: destination != null ? () => Navigator.of(context).push(MaterialPageRoute(builder: (c) => destination)) : null,
-      style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(20), backgroundColor: color.withOpacity(0.1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: destination != null ? color : Colors.grey, width: 2))),
+      style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(20), backgroundColor: color.withValues(alpha: 0.1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: destination != null ? color : Colors.grey, width: 2))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: destination != null ? color : Colors.grey)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70))]),
     );
   }

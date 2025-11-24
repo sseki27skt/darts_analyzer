@@ -1,7 +1,6 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:drift/drift.dart' as drift; 
+import 'package:drift/drift.dart' as drift; // クエリ用 (whereなどで使う可能性があるため残す)
 import '../database.dart';
 
 class GraphPage extends StatefulWidget {
@@ -24,11 +23,9 @@ class _GraphPageState extends State<GraphPage> {
     'Day': 1,
   };
 
-  // フィルタリングされたゲームリスト
   List<Game> _filteredGamesCenter = [];
   List<Game> _filteredGamesCountUp = [];
 
-  // 集計されたスタッツ
   Map<String, int> _statsCenter = {};
   Map<String, int> _statsCountUp = {};
   bool _isLoadingStats = false;
@@ -39,14 +36,12 @@ class _GraphPageState extends State<GraphPage> {
     _filterData();
   }
 
-  // 期間変更時などにデータを再フィルタリング
   void _filterData() {
     final now = DateTime.now();
     final int days = _filterDays[_selectedPeriod]!;
     final DateTime cutoff = now.subtract(Duration(days: days));
     final todayStart = DateTime(now.year, now.month, now.day);
 
-    // 1. 期間でフィルタリング & 時系列ソート
     final periodGames = widget.history.where((g) {
       if (_selectedPeriod == 'All') return true;
       if (_selectedPeriod == 'Day') return g.date.isAfter(todayStart);
@@ -55,27 +50,22 @@ class _GraphPageState extends State<GraphPage> {
     
     periodGames.sort((a, b) => a.date.compareTo(b.date));
 
-    // 2. ゲームモードで分離
     setState(() {
       _filteredGamesCenter = periodGames.where((g) => g.gameType == 0).toList();
       _filteredGamesCountUp = periodGames.where((g) => g.gameType == 1).toList();
     });
 
-    // 3. 詳細スタッツの非同期計算
     _calculateDetailedStats();
   }
 
-  // Throwsテーブルから詳細情報を取得して集計
   Future<void> _calculateDetailedStats() async {
     setState(() => _isLoadingStats = true);
 
-    // ヘルパー関数: ゲームリストからIDを抽出し、対応するThrowを全取得して集計
     Future<Map<String, int>> aggregate(List<Game> games) async {
       if (games.isEmpty) return {};
 
       final ids = games.map((g) => g.id).toList();
       
-      // DBクエリ: 該当するゲームのThrowを全て取得
       final throws = await (database.select(database.throws)
             ..where((t) => t.gameId.isIn(ids)))
           .get();
@@ -91,12 +81,19 @@ class _GraphPageState extends State<GraphPage> {
       for (var t in throws) {
         final label = t.segmentLabel;
         total++;
-        if (label == 'S-BULL') sBull++;
-        else if (label == 'D-BULL') dBull++;
-        else if (label.startsWith('T')) triple++;
-        else if (label.startsWith('D')) doubleRing++;
-        else if (label == 'OUT') out++;
-        else single++;
+        if (label == 'S-BULL') {
+          sBull++;
+        } else if (label == 'D-BULL') {
+          dBull++;
+        } else if (label.startsWith('T')) {
+          triple++;
+        } else if (label.startsWith('D')) {
+          doubleRing++;
+        } else if (label == 'OUT') {
+          out++;
+        } else {
+          single++;
+        }
       }
 
       return {
@@ -132,7 +129,7 @@ class _GraphPageState extends State<GraphPage> {
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Center Count-Up'),
-              Tab(text: 'Count-Up'),
+              Tab(text: 'Count-Up (Real)'),
             ],
             indicatorColor: Colors.amber,
             labelColor: Colors.amber,
@@ -141,7 +138,6 @@ class _GraphPageState extends State<GraphPage> {
         ),
         body: Column(
           children: [
-            // 共通: 期間フィルター
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8),
               color: Colors.black87,
@@ -151,13 +147,11 @@ class _GraphPageState extends State<GraphPage> {
             Expanded(
               child: TabBarView(
                 children: [
-                  // Tab 1: Center Count-Up
                   _buildTabContent(
                     games: _filteredGamesCenter,
                     stats: _statsCenter,
                     isRealMode: false,
                   ),
-                  // Tab 2: Real Count-Up
                   _buildTabContent(
                     games: _filteredGamesCountUp,
                     stats: _statsCountUp,
@@ -181,28 +175,23 @@ class _GraphPageState extends State<GraphPage> {
       return const Center(child: Text("No data in this period.", style: TextStyle(color: Colors.grey)));
     }
 
-    // 基本統計
     double avgScore = 0;
     int maxScore = 0;
-    double avgSdX = 0;
-    double avgSdY = 0;
+    // 未使用変数を削除
+    // double avgSdX = 0;
+    // double avgSdY = 0;
 
     for (var g in games) {
       avgScore += g.score;
-      avgSdX += g.sdX;
-      avgSdY += g.sdY;
       if (g.score > maxScore) maxScore = g.score;
     }
     avgScore /= games.length;
-    avgSdX /= games.length;
-    avgSdY /= games.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Summary Row ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -213,7 +202,6 @@ class _GraphPageState extends State<GraphPage> {
           ),
           const SizedBox(height: 20),
 
-          // --- Overall Stats (Bull Rate etc.) ---
           if (_isLoadingStats)
             const Center(child: LinearProgressIndicator())
           else if (stats.isNotEmpty && stats['total']! > 0)
@@ -221,7 +209,6 @@ class _GraphPageState extends State<GraphPage> {
             
           const SizedBox(height: 30),
 
-          // --- Score Chart ---
           Text("Score History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isRealMode ? Colors.cyanAccent : Colors.orangeAccent)),
           const SizedBox(height: 10),
           SizedBox(
@@ -229,7 +216,6 @@ class _GraphPageState extends State<GraphPage> {
             child: LineChart(_buildScoreChart(games, isRealMode)),
           ),
 
-          // --- Precision Chart (Centerモードのみ) ---
           if (!isRealMode) ...[
             const SizedBox(height: 30),
             const Text("Precision (SD mm)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
@@ -246,7 +232,6 @@ class _GraphPageState extends State<GraphPage> {
     );
   }
 
-  // スタッツ表示カード
   Widget _buildStatsCard(Map<String, int> stats, bool isRealMode) {
     int total = stats['total']!;
     int bulls = (stats['sBull'] ?? 0) + (stats['dBull'] ?? 0);
@@ -272,7 +257,6 @@ class _GraphPageState extends State<GraphPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              // ブル率 (メイン)
               Expanded(
                 flex: 3,
                 child: Column(
@@ -283,7 +267,6 @@ class _GraphPageState extends State<GraphPage> {
                   ],
                 ),
               ),
-              // 内訳
               Expanded(
                 flex: 4,
                 child: Column(
@@ -342,7 +325,7 @@ class _GraphPageState extends State<GraphPage> {
             child: ChoiceChip(
               label: Text(period, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.grey)),
               selected: isSelected,
-              selectedColor: Colors.blueAccent.withOpacity(0.5),
+              selectedColor: Colors.blueAccent.withValues(alpha: 0.5), // 警告が出るなら .withValues(alpha: 0.5)
               backgroundColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.blueAccent : Colors.grey[800]!)),
               onSelected: (bool selected) {
@@ -369,13 +352,17 @@ class _GraphPageState extends State<GraphPage> {
     );
   }
 
-  // スコアチャート (const を削除済み)
   LineChartData _buildScoreChart(List<Game> data, bool isRealMode) {
-    final spots = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score.toDouble())).toList();
+    final spots = data.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), e.value.score.toDouble());
+    }).toList();
+
     double maxScore = 0;
-    for (var spot in spots) if (spot.y > maxScore) maxScore = spot.y;
+    for (var spot in spots) {
+      if (spot.y > maxScore) maxScore = spot.y;
+    }
     
-    double interval = isRealMode ? 50 : 20;
+    double interval = isRealMode ? 50 : 20; 
     double maxY = ((maxScore + 10) / interval).ceil() * interval;
     if (maxY < (isRealMode ? 200 : 100)) maxY = (isRealMode ? 200 : 100);
 
@@ -396,13 +383,12 @@ class _GraphPageState extends State<GraphPage> {
           color: isRealMode ? Colors.cyanAccent : Colors.orangeAccent,
           barWidth: 3,
           dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(show: true, color: (isRealMode ? Colors.cyanAccent : Colors.orangeAccent).withOpacity(0.1)),
+          belowBarData: BarAreaData(show: true, color: (isRealMode ? Colors.cyanAccent : Colors.orangeAccent).withValues(alpha: 0.1)),
         ),
       ],
     );
   }
 
-  // 精度チャート (const を削除済み)
   LineChartData _buildPrecisionChart(List<Game> data) {
     final spotsX = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.sdX)).toList();
     final spotsY = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.sdY)).toList();
@@ -410,15 +396,12 @@ class _GraphPageState extends State<GraphPage> {
     return LineChartData(
       minY: 0, maxY: 60,
       gridData: const FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 10),
-      
-      // ★ここが重要: const を削除しています
       titlesData: FlTitlesData(
         leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30, interval: 10, getTitlesWidget: (v, m) => Text(v.toInt().toString(), style: const TextStyle(color: Colors.grey, fontSize: 10)))),
         bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
-      
       borderData: FlBorderData(show: true, border: Border.all(color: Colors.white12)),
       lineBarsData: [
         LineChartBarData(spots: spotsX, isCurved: true, color: Colors.blueAccent, barWidth: 2, dotData: const FlDotData(show: false)),

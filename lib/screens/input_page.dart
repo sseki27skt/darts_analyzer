@@ -5,8 +5,6 @@ import 'package:drift/drift.dart' as drift;
 import '../database.dart';
 import '../painters/board_painter.dart';
 import 'result_page.dart';
-import 'history_page.dart';
-import 'settings_page.dart';
 import '../utils/score_engine.dart'; 
 import 'package:flutter/gestures.dart'; 
 
@@ -117,27 +115,21 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     }
   }
 
-  // ★修正: タップ処理を画面全体座標に対応
   void _handleTap(TapUpDetails details, BoxConstraints constraints, double boardSizePx) {
     if (_throwsMm.length >= 3) return;
 
-    // 画面(LayoutBuilder)の中心座標
     final double centerX = constraints.maxWidth / 2;
     final double centerY = constraints.maxHeight / 2;
     
-    // タップ位置
     final Offset localPos = details.localPosition;
 
-    // 中心からの相対座標 (ピクセル)
     final Offset relativePx = Offset(
       localPos.dx - centerX,
       localPos.dy - centerY,
     );
 
-    // 拡大率の計算 (boardSizePx は CustomPaint のサイズ = 基準となる正方形の1辺)
     double scale = visibleDiameterMm / boardSizePx;
     
-    // mm単位に変換
     Offset posMm = relativePx * scale;
     double distanceMm = posMm.distance;
 
@@ -189,7 +181,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         final pointsToSave = List<ThrowData>.from(_gameHistoryData); 
         final scoreToSave = _currentScore;
 
-       Navigator.of(context).push(
+        Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ResultPage(
               gameHistoryMm: _gameHistoryData.map((e) => e.positionMm).toList(),
@@ -197,7 +189,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               visibleDiameterMm: visibleDiameterMm,
               ringSizeMm: ringSizeMm,
               ringLargeMm: ringLargeMm,
-              // ★追加: 現在のモードを渡す
               gameMode: _scoringMode, 
             ),
           ),
@@ -209,14 +200,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     });
   }
 
- // lib/screens/input_page.dart 内
-
   Future<void> _saveGameResult(
     int score, 
     double mx, double my, double sdx, double sdy,
     List<ThrowData> pointsToSave, 
   ) async {
-    // Gamesテーブルへの挿入
     final gameId = await database.into(database.games).insert(GamesCompanion.insert(
       date: DateTime.now(),
       score: score,
@@ -226,11 +214,9 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       sdY: sdy,
       ringSizeMm: ringSizeMm,
       ringLargeMm: ringLargeMm,
-      // ★追加: 現在のモードを保存 (0 or 1)
-      gameType: drift.Value(_scoringMode), 
+      gameType: drift.Value(_scoringMode),
     ));
 
-    // Throwsテーブルへの挿入 (変更なし)
     await database.batch((batch) {
       for (int i = 0; i < pointsToSave.length; i++) {
         final p = pointsToSave[i];
@@ -246,7 +232,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         );
       }
     });
-    print("Game Saved to DB! ID: $gameId, Type: $_scoringMode");
+    // print文を削除
   }
 
   void _resetGame() {
@@ -271,7 +257,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(title),
-        backgroundColor: Colors.black.withOpacity(0.8),
+        // ★修正: withOpacity -> withValues
+        backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         actions: const [],
       ),
@@ -284,10 +271,10 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                 builder: (context, constraints) {
                   double availableSize = min(constraints.maxWidth, constraints.maxHeight);
                   
-                  return Listener( // ★修正: Listenerを最上位へ
+                  return Listener( 
                     onPointerSignal: _handleScrollZoom,
-                    child: GestureDetector( // ★修正: GestureDetectorを最上位へ
-                      behavior: HitTestBehavior.translucent, // 透明部分もタップ可能に
+                    child: GestureDetector( 
+                      behavior: HitTestBehavior.translucent, 
                       onScaleStart: (details) {
                         _baseVisibleDiameter = visibleDiameterMm;
                       },
@@ -296,12 +283,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           _handleZoomUpdate(details.scale);
                         }
                       },
-                      // ★修正: constraintsを渡す
                       onTapUp: (details) => _handleTap(details, constraints, availableSize),
                       
                       child: ClipRect(
                         child: Container(
-                          color: Colors.transparent, // タップ判定用
+                          color: Colors.transparent, 
                           width: constraints.maxWidth,
                           height: constraints.maxHeight,
                           child: Center(
@@ -378,7 +364,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           child: Container(
                             width: 44, height: 44, 
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5), 
+                              // ★修正: withOpacity -> withValues
+                              color: Colors.black.withValues(alpha: 0.5), 
                               border: Border.all(
                                 color: isCurrent ? Colors.blueAccent : Colors.white30, 
                                 width: 2
@@ -413,9 +400,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                   onPressed: _throwsMm.length == 3 ? _nextRound : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _roundCount == maxRounds ? Colors.redAccent : Colors.blueAccent,
-                    disabledBackgroundColor: Colors.grey[800]!.withOpacity(0.8),
+                    // ★修正: withOpacity -> withValues
+                    disabledBackgroundColor: Colors.grey[800]!.withValues(alpha: 0.8),
                     elevation: 8,
-                    shadowColor: Colors.black.withOpacity(0.5),
+                    // ★修正: withOpacity -> withValues
+                    shadowColor: Colors.black.withValues(alpha: 0.5),
                   ),
                   child: Text(
                     _roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", 

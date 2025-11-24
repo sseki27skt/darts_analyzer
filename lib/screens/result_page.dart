@@ -57,8 +57,9 @@ class ResultPage extends StatelessWidget {
         final result = DartsScoreEngine.calculate(p);
         final label = result['label'] as String;
         
-        if (label == 'S-BULL') sBullCount++;
-        else if (label == 'D-BULL') dBullCount++;
+        if (label == 'S-BULL') {
+          sBullCount++;
+        } else if (label == 'D-BULL') dBullCount++;
         else if (label.startsWith('T')) tripleCount++;
         else if (label.startsWith('D')) doubleCount++;
         else if (label == 'OUT') outCount++;
@@ -103,7 +104,7 @@ class ResultPage extends StatelessWidget {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Game Result'),
-        backgroundColor: Colors.black.withOpacity(0.5),
+        backgroundColor: Colors.black.withValues(alpha: 0.5),
         elevation: 0,
       ),
       body: Stack(
@@ -145,12 +146,12 @@ class ResultPage extends StatelessWidget {
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[900]!.withOpacity(0.95),
+                  color: Colors.grey[900]!.withValues(alpha: 0.95),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, spreadRadius: 5),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, spreadRadius: 5),
                   ],
-                  border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1), width: 1)),
+                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1)),
                 ),
                 child: SingleChildScrollView(
                   controller: scrollController,
@@ -280,16 +281,16 @@ class ResultPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
       ),
       child: Column(
         children: [
           Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 4),
           Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
-          Text(sub, style: TextStyle(fontSize: 10, color: color.withOpacity(0.8))),
+          Text(sub, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.8))),
         ],
       ),
     );
@@ -312,7 +313,7 @@ class ResultPage extends StatelessWidget {
             val is String ? val : val.toStringAsFixed(1),
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: accentColor),
           ),
-          Text(subtitle, style: TextStyle(fontSize: 10, color: accentColor.withOpacity(0.7))),
+          Text(subtitle, style: TextStyle(fontSize: 10, color: accentColor.withValues(alpha: 0.7))),
         ],
       ),
     );

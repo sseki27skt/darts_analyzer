@@ -243,8 +243,12 @@ class _SettingsPageState extends State<SettingsPage> {
         double sumX = 0, sumY = 0;
         for(int j=0; j<3; j++) {
           double u = 0, v = 0;
-          while(u == 0) u = random.nextDouble(); 
-          while(v == 0) v = random.nextDouble();
+          while(u == 0) {
+            u = random.nextDouble();
+          } 
+          while(v == 0) {
+            v = random.nextDouble();
+          }
           double mag = sqrt(-2.0 * log(u)) * (spread / 2);
           double x = mag * cos(2.0 * pi * v);
           double y = mag * sin(2.0 * pi * v);
