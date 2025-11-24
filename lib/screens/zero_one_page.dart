@@ -54,12 +54,27 @@ class _ZeroOnePageState extends State<ZeroOnePage> {
   Offset _boardOffset = Offset.zero;
   bool _isUiVisible = true;
 
+  late int _totalRounds; // lateで宣言
+
   @override
   void initState() {
     super.initState();
     _currentScore = widget.initialScore;
     _roundStartScore = widget.initialScore;
+    _totalRounds = _getRoundLimit(widget.initialScore);
     _loadSettings();
+  }
+
+  int _getRoundLimit(int score) {
+    if (score <= 301) {
+      return 10;
+    } else if (score <= 701) {
+      // 501, 701
+      return 15;
+    } else {
+      // 901, 1101, 1501
+      return 20;
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -328,7 +343,7 @@ class _ZeroOnePageState extends State<ZeroOnePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "ROUND $_roundCount / $maxRounds",
+                            "ROUND $_roundCount / $_totalRounds",
                             style: const TextStyle(
                               color: Colors.amber,
                               fontWeight: FontWeight.bold,
