@@ -17,6 +17,9 @@ class Games extends Table {
   RealColumn get sdY => real()();
   RealColumn get ringSizeMm => real()();
   RealColumn get ringLargeMm => real()();
+  
+  // ★追加: ゲームの種類を記録 (0: Center, 1: Count-Up)
+  IntColumn get gameType => integer().withDefault(const Constant(0))(); 
 }
 
 @DataClassName('Throw')

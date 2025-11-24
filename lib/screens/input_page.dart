@@ -189,7 +189,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         final pointsToSave = List<ThrowData>.from(_gameHistoryData); 
         final scoreToSave = _currentScore;
 
-        Navigator.of(context).push(
+       Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ResultPage(
               gameHistoryMm: _gameHistoryData.map((e) => e.positionMm).toList(),
@@ -197,6 +197,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               visibleDiameterMm: visibleDiameterMm,
               ringSizeMm: ringSizeMm,
               ringLargeMm: ringLargeMm,
+              // ★追加: 現在のモードを渡す
+              gameMode: _scoringMode, 
             ),
           ),
         ).then((_) {
@@ -207,11 +209,14 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     });
   }
 
+ // lib/screens/input_page.dart 内
+
   Future<void> _saveGameResult(
     int score, 
     double mx, double my, double sdx, double sdy,
     List<ThrowData> pointsToSave, 
   ) async {
+    // Gamesテーブルへの挿入
     final gameId = await database.into(database.games).insert(GamesCompanion.insert(
       date: DateTime.now(),
       score: score,
@@ -221,8 +226,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       sdY: sdy,
       ringSizeMm: ringSizeMm,
       ringLargeMm: ringLargeMm,
+      // ★追加: 現在のモードを保存 (0 or 1)
+      gameType: drift.Value(_scoringMode), 
     ));
 
+    // Throwsテーブルへの挿入 (変更なし)
     await database.batch((batch) {
       for (int i = 0; i < pointsToSave.length; i++) {
         final p = pointsToSave[i];
@@ -238,7 +246,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         );
       }
     });
-    print("Game Saved to DB! ID: $gameId");
+    print("Game Saved to DB! ID: $gameId, Type: $_scoringMode");
   }
 
   void _resetGame() {

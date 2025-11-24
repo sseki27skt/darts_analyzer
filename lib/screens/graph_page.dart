@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../database.dart'; // Gameクラスのため
+import 'package:drift/drift.dart' as drift; 
+import '../database.dart';
 
 class GraphPage extends StatefulWidget {
   final List<Game> history;
@@ -22,108 +24,308 @@ class _GraphPageState extends State<GraphPage> {
     'Day': 1,
   };
 
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    List<Game> sortedHistory = List<Game>.from(widget.history);
-    sortedHistory.sort((a, b) => a.date.compareTo(b.date));
+  // フィルタリングされたゲームリスト
+  List<Game> _filteredGamesCenter = [];
+  List<Game> _filteredGamesCountUp = [];
 
+  // 集計されたスタッツ
+  Map<String, int> _statsCenter = {};
+  Map<String, int> _statsCountUp = {};
+  bool _isLoadingStats = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _filterData();
+  }
+
+  // 期間変更時などにデータを再フィルタリング
+  void _filterData() {
+    final now = DateTime.now();
     final int days = _filterDays[_selectedPeriod]!;
     final DateTime cutoff = now.subtract(Duration(days: days));
+    final todayStart = DateTime(now.year, now.month, now.day);
+
+    // 1. 期間でフィルタリング & 時系列ソート
+    final periodGames = widget.history.where((g) {
+      if (_selectedPeriod == 'All') return true;
+      if (_selectedPeriod == 'Day') return g.date.isAfter(todayStart);
+      return g.date.isAfter(cutoff);
+    }).toList();
     
-    List<Game> filteredHistory;
-    if (_selectedPeriod == 'All') {
-      filteredHistory = sortedHistory;
-    } else if (_selectedPeriod == 'Day') {
-       final todayStart = DateTime(now.year, now.month, now.day);
-       filteredHistory = sortedHistory.where((g) => g.date.isAfter(todayStart)).toList();
-    } else {
-       filteredHistory = sortedHistory.where((g) => g.date.isAfter(cutoff)).toList();
+    periodGames.sort((a, b) => a.date.compareTo(b.date));
+
+    // 2. ゲームモードで分離
+    setState(() {
+      _filteredGamesCenter = periodGames.where((g) => g.gameType == 0).toList();
+      _filteredGamesCountUp = periodGames.where((g) => g.gameType == 1).toList();
+    });
+
+    // 3. 詳細スタッツの非同期計算
+    _calculateDetailedStats();
+  }
+
+  // Throwsテーブルから詳細情報を取得して集計
+  Future<void> _calculateDetailedStats() async {
+    setState(() => _isLoadingStats = true);
+
+    // ヘルパー関数: ゲームリストからIDを抽出し、対応するThrowを全取得して集計
+    Future<Map<String, int>> aggregate(List<Game> games) async {
+      if (games.isEmpty) return {};
+
+      final ids = games.map((g) => g.id).toList();
+      
+      // DBクエリ: 該当するゲームのThrowを全て取得
+      final throws = await (database.select(database.throws)
+            ..where((t) => t.gameId.isIn(ids)))
+          .get();
+
+      int sBull = 0;
+      int dBull = 0;
+      int triple = 0;
+      int doubleRing = 0; 
+      int single = 0;
+      int out = 0;
+      int total = 0;
+
+      for (var t in throws) {
+        final label = t.segmentLabel;
+        total++;
+        if (label == 'S-BULL') sBull++;
+        else if (label == 'D-BULL') dBull++;
+        else if (label.startsWith('T')) triple++;
+        else if (label.startsWith('D')) doubleRing++;
+        else if (label == 'OUT') out++;
+        else single++;
+      }
+
+      return {
+        'sBull': sBull,
+        'dBull': dBull,
+        'triple': triple,
+        'double': doubleRing,
+        'single': single,
+        'out': out,
+        'total': total,
+      };
     }
 
-    if (filteredHistory.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Performance Trends')),
+    final statsC = await aggregate(_filteredGamesCenter);
+    final statsR = await aggregate(_filteredGamesCountUp);
+
+    if (mounted) {
+      setState(() {
+        _statsCenter = statsC;
+        _statsCountUp = statsR;
+        _isLoadingStats = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Performance Trends'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Center Count-Up'),
+              Tab(text: 'Count-Up'),
+            ],
+            indicatorColor: Colors.amber,
+            labelColor: Colors.amber,
+            unselectedLabelColor: Colors.grey,
+          ),
+        ),
         body: Column(
           children: [
-            _buildFilterTabs(),
-            const Expanded(child: Center(child: Text("No data in this period."))),
-          ],
-        ),
-      );
-    }
-
-    double avgScore = 0;
-    double avgSdX = 0;
-    double avgSdY = 0;
-    int maxScore = 0;
-    
-    for (var g in filteredHistory) {
-      avgScore += g.score;
-      avgSdX += g.sdX;
-      avgSdY += g.sdY;
-      if (g.score > maxScore) maxScore = g.score;
-    }
-    avgScore /= filteredHistory.length;
-    avgSdX /= filteredHistory.length;
-    avgSdY /= filteredHistory.length;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Performance Trends')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildFilterTabs(),
-            const SizedBox(height: 10),
-            
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildSummaryItem("Games", "${filteredHistory.length}", Colors.white),
-                _buildSummaryItem("Avg Score", avgScore.toStringAsFixed(1), Colors.orangeAccent),
-                _buildSummaryItem("Best Score", "$maxScore", Colors.redAccent),
-              ],
+            // 共通: 期間フィルター
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.black87,
+              child: _buildFilterTabs(),
             ),
-            const Divider(color: Colors.white24, height: 30),
-
+            
             Expanded(
-              child: ListView(
+              child: TabBarView(
                 children: [
-                  const Text("Score History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 220,
-                    child: LineChart(
-                      _buildScoreChart(filteredHistory),
-                    ),
+                  // Tab 1: Center Count-Up
+                  _buildTabContent(
+                    games: _filteredGamesCenter,
+                    stats: _statsCenter,
+                    isRealMode: false,
                   ),
-                  const SizedBox(height: 30),
-                  const Text("Precision (SD mm)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 220,
-                    child: LineChart(
-                      _buildPrecisionChart(filteredHistory),
-                    ),
+                  // Tab 2: Real Count-Up
+                  _buildTabContent(
+                    games: _filteredGamesCountUp,
+                    stats: _statsCountUp,
+                    isRealMode: true,
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.horizontal_rule, color: Colors.blueAccent, size: 12), 
-                      Text(" X-SD (Avg: ${avgSdX.toStringAsFixed(1)}) ", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      const SizedBox(width: 15),
-                      const Icon(Icons.horizontal_rule, color: Colors.redAccent, size: 12), 
-                      Text(" Y-SD (Avg: ${avgSdY.toStringAsFixed(1)})", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTabContent({
+    required List<Game> games,
+    required Map<String, int> stats,
+    required bool isRealMode,
+  }) {
+    if (games.isEmpty) {
+      return const Center(child: Text("No data in this period.", style: TextStyle(color: Colors.grey)));
+    }
+
+    // 基本統計
+    double avgScore = 0;
+    int maxScore = 0;
+    double avgSdX = 0;
+    double avgSdY = 0;
+
+    for (var g in games) {
+      avgScore += g.score;
+      avgSdX += g.sdX;
+      avgSdY += g.sdY;
+      if (g.score > maxScore) maxScore = g.score;
+    }
+    avgScore /= games.length;
+    avgSdX /= games.length;
+    avgSdY /= games.length;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Summary Row ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSummaryItem("Games", "${games.length}", Colors.white),
+              _buildSummaryItem("Avg Score", avgScore.toStringAsFixed(1), isRealMode ? Colors.cyanAccent : Colors.orangeAccent),
+              _buildSummaryItem("High Score", "$maxScore", Colors.redAccent),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // --- Overall Stats (Bull Rate etc.) ---
+          if (_isLoadingStats)
+            const Center(child: LinearProgressIndicator())
+          else if (stats.isNotEmpty && stats['total']! > 0)
+            _buildStatsCard(stats, isRealMode),
+            
+          const SizedBox(height: 30),
+
+          // --- Score Chart ---
+          Text("Score History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isRealMode ? Colors.cyanAccent : Colors.orangeAccent)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 200,
+            child: LineChart(_buildScoreChart(games, isRealMode)),
+          ),
+
+          // --- Precision Chart (Centerモードのみ) ---
+          if (!isRealMode) ...[
+            const SizedBox(height: 30),
+            const Text("Precision (SD mm)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 200,
+              child: LineChart(_buildPrecisionChart(games)),
+            ),
+          ],
+          
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  // スタッツ表示カード
+  Widget _buildStatsCard(Map<String, int> stats, bool isRealMode) {
+    int total = stats['total']!;
+    int bulls = (stats['sBull'] ?? 0) + (stats['dBull'] ?? 0);
+    double bullRate = (bulls / total) * 100;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("OVERALL STATS", style: TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 1.5)),
+              Text("Total Throws: $total", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // ブル率 (メイン)
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("${bullRate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.amber)),
+                    const Text("Total Bull Rate", style: TextStyle(fontSize: 12, color: Colors.amberAccent)),
+                  ],
+                ),
+              ),
+              // 内訳
+              Expanded(
+                flex: 4,
+                child: Column(
+                  children: [
+                    _buildStatRow("D-Bull", stats['dBull']!, total, Colors.redAccent),
+                    _buildStatRow("S-Bull", stats['sBull']!, total, Colors.white),
+                    if (isRealMode) ...[
+                      _buildStatRow("Triple", stats['triple']!, total, Colors.orange),
+                    ] else ...[
+                      _buildStatRow("Inner", stats['single']!, total, Colors.blueGrey), 
+                    ],
+                    _buildStatRow("Out", stats['out']!, total, Colors.grey),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, int count, int total, Color color) {
+    double pct = total > 0 ? (count / total * 100) : 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          SizedBox(width: 50, child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold))),
+          Expanded(
+            child: Stack(
+              children: [
+                Container(height: 8, decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(4))),
+                FractionallySizedBox(
+                  widthFactor: pct / 100,
+                  child: Container(height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4))),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 40, child: Text("${pct.toStringAsFixed(1)}%", textAlign: TextAlign.right, style: const TextStyle(color: Colors.grey, fontSize: 11))),
+        ],
       ),
     );
   }
@@ -138,14 +340,17 @@ class _GraphPageState extends State<GraphPage> {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: ChoiceChip(
-              label: Text(period),
+              label: Text(period, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.grey)),
               selected: isSelected,
-              selectedColor: Colors.blueAccent.withOpacity(0.3),
+              selectedColor: Colors.blueAccent.withOpacity(0.5),
+              backgroundColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.blueAccent : Colors.grey[800]!)),
               onSelected: (bool selected) {
                 if (selected) {
                   setState(() {
                     _selectedPeriod = period;
                   });
+                  _filterData(); 
                 }
               },
             ),
@@ -164,119 +369,60 @@ class _GraphPageState extends State<GraphPage> {
     );
   }
 
-  LineChartData _buildScoreChart(List<Game> data) {
-    final spots = data.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), e.value.score.toDouble());
-    }).toList();
-
+  // スコアチャート (const を削除済み)
+  LineChartData _buildScoreChart(List<Game> data, bool isRealMode) {
+    final spots = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score.toDouble())).toList();
     double maxScore = 0;
-    for (var spot in spots) {
-      if (spot.y > maxScore) maxScore = spot.y;
-    }
-
-    // ★修正: 最大値を「20の倍数」に切り上げて、常にグリッドぴったりで終わるようにする
-    // 例: maxScoreが105なら -> 120まで確保したい -> 余白も考えて140にする
-    // ここでは「(最大スコア + 10) を 20 で割って切り上げ × 20」とします
-    double maxY = ((maxScore + 10) / 20).ceil() * 20.0;
+    for (var spot in spots) if (spot.y > maxScore) maxScore = spot.y;
     
-    // 最低でも100点までは表示する
-    if (maxY < 100) maxY = 100;
+    double interval = isRealMode ? 50 : 20;
+    double maxY = ((maxScore + 10) / interval).ceil() * interval;
+    if (maxY < (isRealMode ? 200 : 100)) maxY = (isRealMode ? 200 : 100);
 
     return LineChartData(
-      minY: 0,
-      maxY: maxY, // ★修正したmaxYを使用
-      
-      gridData: const FlGridData(
-        show: true, 
-        drawVerticalLine: false,
-        horizontalInterval: 20, // 20点刻み
-      ),
-      
+      minY: 0, maxY: maxY,
+      gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: interval),
       titlesData: FlTitlesData(
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 50, // 3桁表示用に広げたまま
-            interval: 20,
-            getTitlesWidget: (value, meta) {
-              // 最大値そのものは表示しない（天井の線と被るため）
-              // 必要な場合は `if (value > maxY)` だけにする
-              if (value > maxY || value % 1 != 0) return const SizedBox.shrink();
-              return Text(
-                value.toInt().toString(),
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-                textAlign: TextAlign.right,
-              );
-            },
-          ),
-        ),
+        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, interval: interval, getTitlesWidget: (v, m) => Text(v.toInt().toString(), style: const TextStyle(color: Colors.grey, fontSize: 10)))),
         bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
-      
-      borderData: FlBorderData(
-        show: true,
-        border: Border.all(color: Colors.white12),
-      ),
-      
+      borderData: FlBorderData(show: true, border: Border.all(color: Colors.white12)),
       lineBarsData: [
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          curveSmoothness: 0.2,
-          color: Colors.orangeAccent,
+          color: isRealMode ? Colors.cyanAccent : Colors.orangeAccent,
           barWidth: 3,
-          isStrokeCapRound: true,
-          dotData: FlDotData(
-            show: true,
-            getDotPainter: (spot, percent, barData, index) {
-              return FlDotCirclePainter(
-                radius: 4,
-                color: Colors.black,
-                strokeWidth: 2,
-                strokeColor: Colors.orangeAccent,
-              );
-            },
-          ),
-          belowBarData: BarAreaData(
-            show: true, 
-            color: Colors.orangeAccent.withOpacity(0.1)
-          ),
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: (isRealMode ? Colors.cyanAccent : Colors.orangeAccent).withOpacity(0.1)),
         ),
       ],
     );
   }
 
+  // 精度チャート (const を削除済み)
   LineChartData _buildPrecisionChart(List<Game> data) {
     final spotsX = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.sdX)).toList();
     final spotsY = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.sdY)).toList();
 
     return LineChartData(
       minY: 0, maxY: 60,
-      gridData: const FlGridData(show: true, drawVerticalLine: false),
-      titlesData: const FlTitlesData(
-        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30, interval: 10)),
-        bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      gridData: const FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 10),
+      
+      // ★ここが重要: const を削除しています
+      titlesData: FlTitlesData(
+        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30, interval: 10, getTitlesWidget: (v, m) => Text(v.toInt().toString(), style: const TextStyle(color: Colors.grey, fontSize: 10)))),
+        bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
+      
       borderData: FlBorderData(show: true, border: Border.all(color: Colors.white12)),
       lineBarsData: [
-        LineChartBarData(
-          spots: spotsX,
-          isCurved: true,
-          color: Colors.blueAccent,
-          barWidth: 2,
-          dotData: const FlDotData(show: false),
-        ),
-        LineChartBarData(
-          spots: spotsY,
-          isCurved: true,
-          color: Colors.redAccent,
-          barWidth: 2,
-          dotData: const FlDotData(show: false),
-        ),
+        LineChartBarData(spots: spotsX, isCurved: true, color: Colors.blueAccent, barWidth: 2, dotData: const FlDotData(show: false)),
+        LineChartBarData(spots: spotsY, isCurved: true, color: Colors.redAccent, barWidth: 2, dotData: const FlDotData(show: false)),
       ],
     );
   }
