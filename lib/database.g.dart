@@ -109,6 +109,21 @@ class $GamesTable extends Games with TableInfo<$GamesTable, Game> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isMasterOutMeta = const VerificationMeta(
+    'isMasterOut',
+  );
+  @override
+  late final GeneratedColumn<bool> isMasterOut = GeneratedColumn<bool>(
+    'is_master_out',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_master_out" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -121,6 +136,7 @@ class $GamesTable extends Games with TableInfo<$GamesTable, Game> {
     ringSizeMm,
     ringLargeMm,
     gameType,
+    isMasterOut,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -213,6 +229,15 @@ class $GamesTable extends Games with TableInfo<$GamesTable, Game> {
         gameType.isAcceptableOrUnknown(data['game_type']!, _gameTypeMeta),
       );
     }
+    if (data.containsKey('is_master_out')) {
+      context.handle(
+        _isMasterOutMeta,
+        isMasterOut.isAcceptableOrUnknown(
+          data['is_master_out']!,
+          _isMasterOutMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -262,6 +287,10 @@ class $GamesTable extends Games with TableInfo<$GamesTable, Game> {
         DriftSqlType.int,
         data['${effectivePrefix}game_type'],
       )!,
+      isMasterOut: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_master_out'],
+      )!,
     );
   }
 
@@ -282,6 +311,7 @@ class Game extends DataClass implements Insertable<Game> {
   final double ringSizeMm;
   final double ringLargeMm;
   final int gameType;
+  final bool isMasterOut;
   const Game({
     required this.id,
     required this.date,
@@ -293,6 +323,7 @@ class Game extends DataClass implements Insertable<Game> {
     required this.ringSizeMm,
     required this.ringLargeMm,
     required this.gameType,
+    required this.isMasterOut,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -307,6 +338,7 @@ class Game extends DataClass implements Insertable<Game> {
     map['ring_size_mm'] = Variable<double>(ringSizeMm);
     map['ring_large_mm'] = Variable<double>(ringLargeMm);
     map['game_type'] = Variable<int>(gameType);
+    map['is_master_out'] = Variable<bool>(isMasterOut);
     return map;
   }
 
@@ -322,6 +354,7 @@ class Game extends DataClass implements Insertable<Game> {
       ringSizeMm: Value(ringSizeMm),
       ringLargeMm: Value(ringLargeMm),
       gameType: Value(gameType),
+      isMasterOut: Value(isMasterOut),
     );
   }
 
@@ -341,6 +374,7 @@ class Game extends DataClass implements Insertable<Game> {
       ringSizeMm: serializer.fromJson<double>(json['ringSizeMm']),
       ringLargeMm: serializer.fromJson<double>(json['ringLargeMm']),
       gameType: serializer.fromJson<int>(json['gameType']),
+      isMasterOut: serializer.fromJson<bool>(json['isMasterOut']),
     );
   }
   @override
@@ -357,6 +391,7 @@ class Game extends DataClass implements Insertable<Game> {
       'ringSizeMm': serializer.toJson<double>(ringSizeMm),
       'ringLargeMm': serializer.toJson<double>(ringLargeMm),
       'gameType': serializer.toJson<int>(gameType),
+      'isMasterOut': serializer.toJson<bool>(isMasterOut),
     };
   }
 
@@ -371,6 +406,7 @@ class Game extends DataClass implements Insertable<Game> {
     double? ringSizeMm,
     double? ringLargeMm,
     int? gameType,
+    bool? isMasterOut,
   }) => Game(
     id: id ?? this.id,
     date: date ?? this.date,
@@ -382,6 +418,7 @@ class Game extends DataClass implements Insertable<Game> {
     ringSizeMm: ringSizeMm ?? this.ringSizeMm,
     ringLargeMm: ringLargeMm ?? this.ringLargeMm,
     gameType: gameType ?? this.gameType,
+    isMasterOut: isMasterOut ?? this.isMasterOut,
   );
   Game copyWithCompanion(GamesCompanion data) {
     return Game(
@@ -399,6 +436,9 @@ class Game extends DataClass implements Insertable<Game> {
           ? data.ringLargeMm.value
           : this.ringLargeMm,
       gameType: data.gameType.present ? data.gameType.value : this.gameType,
+      isMasterOut: data.isMasterOut.present
+          ? data.isMasterOut.value
+          : this.isMasterOut,
     );
   }
 
@@ -414,7 +454,8 @@ class Game extends DataClass implements Insertable<Game> {
           ..write('sdY: $sdY, ')
           ..write('ringSizeMm: $ringSizeMm, ')
           ..write('ringLargeMm: $ringLargeMm, ')
-          ..write('gameType: $gameType')
+          ..write('gameType: $gameType, ')
+          ..write('isMasterOut: $isMasterOut')
           ..write(')'))
         .toString();
   }
@@ -431,6 +472,7 @@ class Game extends DataClass implements Insertable<Game> {
     ringSizeMm,
     ringLargeMm,
     gameType,
+    isMasterOut,
   );
   @override
   bool operator ==(Object other) =>
@@ -445,7 +487,8 @@ class Game extends DataClass implements Insertable<Game> {
           other.sdY == this.sdY &&
           other.ringSizeMm == this.ringSizeMm &&
           other.ringLargeMm == this.ringLargeMm &&
-          other.gameType == this.gameType);
+          other.gameType == this.gameType &&
+          other.isMasterOut == this.isMasterOut);
 }
 
 class GamesCompanion extends UpdateCompanion<Game> {
@@ -459,6 +502,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
   final Value<double> ringSizeMm;
   final Value<double> ringLargeMm;
   final Value<int> gameType;
+  final Value<bool> isMasterOut;
   const GamesCompanion({
     this.id = const Value.absent(),
     this.date = const Value.absent(),
@@ -470,6 +514,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
     this.ringSizeMm = const Value.absent(),
     this.ringLargeMm = const Value.absent(),
     this.gameType = const Value.absent(),
+    this.isMasterOut = const Value.absent(),
   });
   GamesCompanion.insert({
     this.id = const Value.absent(),
@@ -482,6 +527,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
     required double ringSizeMm,
     required double ringLargeMm,
     this.gameType = const Value.absent(),
+    this.isMasterOut = const Value.absent(),
   }) : date = Value(date),
        score = Value(score),
        meanX = Value(meanX),
@@ -501,6 +547,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
     Expression<double>? ringSizeMm,
     Expression<double>? ringLargeMm,
     Expression<int>? gameType,
+    Expression<bool>? isMasterOut,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -513,6 +560,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
       if (ringSizeMm != null) 'ring_size_mm': ringSizeMm,
       if (ringLargeMm != null) 'ring_large_mm': ringLargeMm,
       if (gameType != null) 'game_type': gameType,
+      if (isMasterOut != null) 'is_master_out': isMasterOut,
     });
   }
 
@@ -527,6 +575,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
     Value<double>? ringSizeMm,
     Value<double>? ringLargeMm,
     Value<int>? gameType,
+    Value<bool>? isMasterOut,
   }) {
     return GamesCompanion(
       id: id ?? this.id,
@@ -539,6 +588,7 @@ class GamesCompanion extends UpdateCompanion<Game> {
       ringSizeMm: ringSizeMm ?? this.ringSizeMm,
       ringLargeMm: ringLargeMm ?? this.ringLargeMm,
       gameType: gameType ?? this.gameType,
+      isMasterOut: isMasterOut ?? this.isMasterOut,
     );
   }
 
@@ -575,6 +625,9 @@ class GamesCompanion extends UpdateCompanion<Game> {
     if (gameType.present) {
       map['game_type'] = Variable<int>(gameType.value);
     }
+    if (isMasterOut.present) {
+      map['is_master_out'] = Variable<bool>(isMasterOut.value);
+    }
     return map;
   }
 
@@ -590,7 +643,8 @@ class GamesCompanion extends UpdateCompanion<Game> {
           ..write('sdY: $sdY, ')
           ..write('ringSizeMm: $ringSizeMm, ')
           ..write('ringLargeMm: $ringLargeMm, ')
-          ..write('gameType: $gameType')
+          ..write('gameType: $gameType, ')
+          ..write('isMasterOut: $isMasterOut')
           ..write(')'))
         .toString();
   }
@@ -1014,6 +1068,7 @@ typedef $$GamesTableCreateCompanionBuilder =
       required double ringSizeMm,
       required double ringLargeMm,
       Value<int> gameType,
+      Value<bool> isMasterOut,
     });
 typedef $$GamesTableUpdateCompanionBuilder =
     GamesCompanion Function({
@@ -1027,6 +1082,7 @@ typedef $$GamesTableUpdateCompanionBuilder =
       Value<double> ringSizeMm,
       Value<double> ringLargeMm,
       Value<int> gameType,
+      Value<bool> isMasterOut,
     });
 
 final class $$GamesTableReferences
@@ -1108,6 +1164,11 @@ class $$GamesTableFilterComposer extends Composer<_$AppDatabase, $GamesTable> {
 
   ColumnFilters<int> get gameType => $composableBuilder(
     column: $table.gameType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isMasterOut => $composableBuilder(
+    column: $table.isMasterOut,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1195,6 +1256,11 @@ class $$GamesTableOrderingComposer
     column: $table.gameType,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isMasterOut => $composableBuilder(
+    column: $table.isMasterOut,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$GamesTableAnnotationComposer
@@ -1239,6 +1305,11 @@ class $$GamesTableAnnotationComposer
 
   GeneratedColumn<int> get gameType =>
       $composableBuilder(column: $table.gameType, builder: (column) => column);
+
+  GeneratedColumn<bool> get isMasterOut => $composableBuilder(
+    column: $table.isMasterOut,
+    builder: (column) => column,
+  );
 
   Expression<T> throwsRefs<T extends Object>(
     Expression<T> Function($$ThrowsTableAnnotationComposer a) f,
@@ -1304,6 +1375,7 @@ class $$GamesTableTableManager
                 Value<double> ringSizeMm = const Value.absent(),
                 Value<double> ringLargeMm = const Value.absent(),
                 Value<int> gameType = const Value.absent(),
+                Value<bool> isMasterOut = const Value.absent(),
               }) => GamesCompanion(
                 id: id,
                 date: date,
@@ -1315,6 +1387,7 @@ class $$GamesTableTableManager
                 ringSizeMm: ringSizeMm,
                 ringLargeMm: ringLargeMm,
                 gameType: gameType,
+                isMasterOut: isMasterOut,
               ),
           createCompanionCallback:
               ({
@@ -1328,6 +1401,7 @@ class $$GamesTableTableManager
                 required double ringSizeMm,
                 required double ringLargeMm,
                 Value<int> gameType = const Value.absent(),
+                Value<bool> isMasterOut = const Value.absent(),
               }) => GamesCompanion.insert(
                 id: id,
                 date: date,
@@ -1339,6 +1413,7 @@ class $$GamesTableTableManager
                 ringSizeMm: ringSizeMm,
                 ringLargeMm: ringLargeMm,
                 gameType: gameType,
+                isMasterOut: isMasterOut,
               ),
           withReferenceMapper: (p0) => p0
               .map(

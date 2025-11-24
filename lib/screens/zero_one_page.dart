@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/services.dart';
 import '../database.dart';
 import '../painters/board_painter.dart';
 import 'result_page.dart';
 import '../utils/score_engine.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/services.dart'; // HapticFeedback用
 
 class ThrowData {
   final Offset positionMm;
@@ -16,50 +16,49 @@ class ThrowData {
   ThrowData(this.positionMm, this.score, this.label);
 }
 
-class PrecisionInputPage extends StatefulWidget {
-  final int gameMode;
-  const PrecisionInputPage({super.key, this.gameMode = 0});
+class ZeroOnePage extends StatefulWidget {
+  final int initialScore; // 301, 501, ...
+  final bool isMasterOut; // false: Open, true: Master
+
+  const ZeroOnePage({
+    super.key,
+    required this.initialScore,
+    required this.isMasterOut,
+  });
 
   @override
-  State<PrecisionInputPage> createState() => _PrecisionInputPageState();
+  State<ZeroOnePage> createState() => _ZeroOnePageState();
 }
 
-class _PrecisionInputPageState extends State<PrecisionInputPage> {
-  // --- 状態変数 ---
+class _ZeroOnePageState extends State<ZeroOnePage> {
   double visibleDiameterMm = 160.0;
   double ringSizeMm = 63.0;
   double ringLargeMm = 83.0;
-  late int _scoringMode;
-
-  int _scoreInner = 5;
-  int _scoreOuter = 4;
-  int _scoreSmall = 3;
-  int _scoreLarge = 2;
-  int _scoreArea = 0;
-  double _outBoundaryMm = 340.0;
 
   final List<ThrowData> _throwsData = [];
   final List<Offset> _throwsMm = [];
   final List<int> _throwScores = [];
   final List<ThrowData> _gameHistoryData = [];
 
-  int _currentScore = 0;
+  late int _currentScore;
+  int _roundStartScore = 0;
   int _roundCount = 1;
-  static const int maxRounds = 8;
+  static const int maxRounds = 20;
+
   String _lastHitLabel = "";
+  bool _isBust = false;
 
   double _baseVisibleDiameter = 160.0;
   static const double minZoomMm = 160.0;
   static const double maxZoomMm = 400.0;
-
-  // ★追加: UIの表示状態
-  bool _isUiVisible = true;
   Offset _boardOffset = Offset.zero;
+  bool _isUiVisible = true;
 
   @override
   void initState() {
     super.initState();
-    _scoringMode = widget.gameMode;
+    _currentScore = widget.initialScore;
+    _roundStartScore = widget.initialScore;
     _loadSettings();
   }
 
@@ -68,36 +67,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     setState(() {
       ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
-
-      _scoreInner = prefs.getInt('score_inner') ?? 5;
-      _scoreOuter = prefs.getInt('score_outer') ?? 4;
-      _scoreSmall = prefs.getInt('score_small') ?? 3;
-      _scoreLarge = prefs.getInt('score_large') ?? 2;
-      _scoreArea = prefs.getInt('score_area') ?? 0;
-
-      int boundaryType = prefs.getInt('boundary_type') ?? 0;
-      switch (boundaryType) {
-        case 0:
-          _outBoundaryMm = 340.0;
-          break;
-        case 1:
-          _outBoundaryMm = 198.0;
-          break;
-
-        default:
-          _outBoundaryMm = 340.0;
-      }
       _baseVisibleDiameter = visibleDiameterMm;
     });
-  }
-
-  int _calculatePoint(double distanceMm) {
-    if (distanceMm > _outBoundaryMm / 2) return 0;
-    if (distanceMm <= 8.0) return _scoreInner;
-    if (distanceMm <= 22.0) return _scoreOuter;
-    if (distanceMm <= ringSizeMm / 2) return _scoreSmall;
-    if (distanceMm <= ringLargeMm / 2) return _scoreLarge;
-    return _scoreArea;
   }
 
   void _handleZoomUpdate(double scale) {
@@ -124,49 +95,75 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     BoxConstraints constraints,
     double boardSizePx,
   ) {
-    if (_throwsMm.length >= 3) return;
+    if (_throwsMm.length >= 3 || _isBust || _currentScore == 0) return;
 
     final double centerX = constraints.maxWidth / 2;
     final double centerY = constraints.maxHeight / 2;
     final Offset localPos = details.localPosition;
-
     final Offset relativePx = Offset(
       localPos.dx - centerX - _boardOffset.dx,
       localPos.dy - centerY - _boardOffset.dy,
     );
-
     double scale = visibleDiameterMm / boardSizePx;
     Offset posMm = relativePx * scale;
-    double distanceMm = posMm.distance;
 
     final realResult = DartsScoreEngine.calculate(posMm);
     String label = realResult['label'];
-    int realScore = realResult['score'];
+    int hitScore = realResult['score'];
+    int multiplier = realResult['multiplier'];
 
     setState(() {
-      int pts = 0;
-      if (_scoringMode == 1) {
-        pts = realScore;
-      } else {
-        pts = _calculatePoint(distanceMm);
-      }
-
-      final newThrow = ThrowData(posMm, pts, label);
+      final newThrow = ThrowData(posMm, hitScore, label);
       _throwsData.add(newThrow);
       _throwsMm.add(posMm);
-      _throwScores.add(pts);
-      _currentScore += pts;
-      _lastHitLabel = label;
+      _throwScores.add(hitScore);
+
+      int tempScore = _currentScore - hitScore;
+      bool bust = false;
+
+      if (tempScore < 0) {
+        bust = true;
+      } else if (tempScore == 0) {
+        if (widget.isMasterOut) {
+          bool isBull = label.contains('BULL');
+          if (multiplier < 2 && !isBull) bust = true;
+        }
+      } else if (tempScore == 1 && widget.isMasterOut) {
+        bust = true;
+      }
+
+      if (bust) {
+        _isBust = true;
+        _lastHitLabel = "BUST!";
+        _currentScore = _roundStartScore;
+      } else if (tempScore == 0) {
+        _currentScore = 0;
+        _lastHitLabel = "FINISH!";
+      } else {
+        _currentScore = tempScore;
+        _lastHitLabel = label;
+      }
     });
   }
 
   void _undo() {
     if (_throwsData.isEmpty) return;
     setState(() {
-      final removed = _throwsData.removeLast();
-      _throwsMm.removeLast();
-      _throwScores.removeLast();
-      _currentScore -= removed.score;
+      if (_isBust) {
+        _isBust = false;
+        _currentScore = _roundStartScore;
+        for (int i = 0; i < _throwScores.length - 1; i++) {
+          _currentScore -= _throwScores[i];
+        }
+        final removed = _throwsData.removeLast();
+        _throwsMm.removeLast();
+        _throwScores.removeLast();
+      } else {
+        final removed = _throwsData.removeLast();
+        _throwsMm.removeLast();
+        _throwScores.removeLast();
+        _currentScore += removed.score;
+      }
       if (_throwsData.isNotEmpty) {
         _lastHitLabel = _throwsData.last.label;
       } else {
@@ -177,91 +174,64 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   void _nextRound() {
     _gameHistoryData.addAll(_throwsData);
+    bool isFinish = _currentScore == 0;
+
     setState(() {
-      if (_roundCount < maxRounds) {
+      if (!isFinish && _roundCount < maxRounds) {
         _roundCount++;
         _throwsData.clear();
         _throwsMm.clear();
         _throwScores.clear();
         _lastHitLabel = "";
+        _isBust = false;
+        _roundStartScore = _currentScore;
       } else {
-        double sumX = 0, sumY = 0;
-        for (var p in _gameHistoryData) {
-          sumX += p.positionMm.dx;
-          sumY += p.positionMm.dy;
-        }
-        double meanX = sumX / _gameHistoryData.length;
-        double meanY = sumY / _gameHistoryData.length;
-
-        double sumSqDiffX = 0, sumSqDiffY = 0;
-        for (var p in _gameHistoryData) {
-          sumSqDiffX += pow(p.positionMm.dx - meanX, 2);
-          sumSqDiffY += pow(p.positionMm.dy - meanY, 2);
-        }
-        double sdX = sqrt(sumSqDiffX / _gameHistoryData.length);
-        double sdY = sqrt(sumSqDiffY / _gameHistoryData.length);
-
-        final pointsToSave = List<ThrowData>.from(_gameHistoryData);
-        final scoreToSave = _currentScore;
-
-        Navigator.of(context)
-            .push(
-              MaterialPageRoute(
-                builder: (context) => ResultPage(
-                  gameHistoryMm: _gameHistoryData
-                      .map((e) => e.positionMm)
-                      .toList(),
-                  totalScore: scoreToSave,
-                  visibleDiameterMm: visibleDiameterMm,
-                  ringSizeMm: ringSizeMm,
-                  ringLargeMm: ringLargeMm,
-                  gameMode: _scoringMode,
-                ),
-              ),
-            )
-            .then((_) {
-              _saveGameResult(
-                scoreToSave,
-                meanX,
-                meanY,
-                sdX,
-                sdY,
-                pointsToSave,
-              );
-              _resetGame();
-            });
+        _finishGame();
       }
     });
   }
 
-  Future<void> _saveGameResult(
-    int score,
-    double mx,
-    double my,
-    double sdx,
-    double sdy,
-    List<ThrowData> pointsToSave,
-  ) async {
+  void _finishGame() {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) => ResultPage(
+              gameHistoryMm: _gameHistoryData.map((e) => e.positionMm).toList(),
+              totalScore: widget.initialScore - _currentScore,
+              visibleDiameterMm: visibleDiameterMm,
+              ringSizeMm: ringSizeMm,
+              ringLargeMm: ringLargeMm,
+              gameMode: widget.initialScore,
+            ),
+          ),
+        )
+        .then((_) {
+          _saveGameResult();
+          Navigator.of(context).pop();
+        });
+  }
+
+  Future<void> _saveGameResult() async {
     final gameId = await database
         .into(database.games)
         .insert(
           GamesCompanion.insert(
             date: DateTime.now(),
-            score: score,
-            meanX: mx,
-            meanY: my,
-            sdX: sdx,
-            sdY: sdy,
+            score: widget.initialScore - _currentScore,
+            meanX: 0,
+            meanY: 0,
+            sdX: 0,
+            sdY: 0,
             ringSizeMm: ringSizeMm,
             ringLargeMm: ringLargeMm,
-            gameType: drift.Value(_scoringMode),
-            isMasterOut: const drift.Value(false),
+            gameType: drift.Value(widget.initialScore),
+            isMasterOut: drift.Value(widget.isMasterOut),
           ),
         );
 
     await database.batch((batch) {
-      for (int i = 0; i < pointsToSave.length; i++) {
-        final p = pointsToSave[i];
+      for (int i = 0; i < _gameHistoryData.length; i++) {
+        final p = _gameHistoryData[i];
         batch.insert(
           database.throws,
           ThrowsCompanion.insert(
@@ -276,29 +246,12 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     });
   }
 
-  void _resetGame() {
-    setState(() {
-      _gameHistoryData.clear();
-      _throwsData.clear();
-      _throwsMm.clear();
-      _throwScores.clear();
-      _currentScore = 0;
-      _roundCount = 1;
-      _lastHitLabel = "";
-      visibleDiameterMm = minZoomMm;
-      _baseVisibleDiameter = minZoomMm;
-      _boardOffset = Offset.zero;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    String title = _scoringMode == 0 ? 'Center Count-Up' : 'Count-Up';
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: Text(title),
+        title: Text("${widget.initialScore} Game"),
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         actions: const [],
@@ -306,7 +259,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // --- Layer 1: ダーツボード (最背面) ---
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -314,32 +266,23 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                     constraints.maxWidth,
                     constraints.maxHeight,
                   );
-
                   return Listener(
                     onPointerSignal: _handleScrollZoom,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onScaleStart: (details) {
-                        _baseVisibleDiameter = visibleDiameterMm;
-                      },
+                      onScaleStart: (details) =>
+                          _baseVisibleDiameter = visibleDiameterMm,
                       onScaleUpdate: (details) {
-                        if (details.scale != 1.0) {
+                        if (details.scale != 1.0)
                           _handleZoomUpdate(details.scale);
-                        }
-                        setState(() {
-                          _boardOffset += details.focalPointDelta;
-                        });
+                        setState(() => _boardOffset += details.focalPointDelta);
                       },
-                      // 長押しで「スコア表示」のON/OFF切り替え
                       onLongPress: () {
-                        setState(() {
-                          _isUiVisible = !_isUiVisible;
-                        });
+                        setState(() => _isUiVisible = !_isUiVisible);
                         HapticFeedback.mediumImpact();
                       },
                       onTapUp: (details) =>
                           _handleTap(details, constraints, availableSize),
-
                       child: ClipRect(
                         child: Container(
                           color: Colors.transparent,
@@ -355,7 +298,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                                   visibleDiameterMm: visibleDiameterMm,
                                   ringSizeMm: ringSizeMm,
                                   ringLargeMm: ringLargeMm,
-                                  showPracticeRings: _scoringMode == 0,
+                                  // ★修正: 01ではリングを表示しない
+                                  showPracticeRings: false,
                                 ),
                               ),
                             ),
@@ -368,7 +312,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               ),
             ),
 
-            // --- Layer 2: スコア情報 (長押しで消える) ---
             Positioned(
               top: 10,
               left: 20,
@@ -390,83 +333,57 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                               shadows: [
-                                Shadow(
-                                  blurRadius: 4.0,
-                                  color: Colors.black,
-                                  offset: Offset(2, 2),
-                                ),
+                                Shadow(blurRadius: 4, color: Colors.black),
                               ],
                             ),
                           ),
+                          // 残りスコア
                           Text(
-                            "Total: $_currentScore",
-                            style: const TextStyle(
-                              fontSize: 24,
+                            "$_currentScore",
+                            style: TextStyle(
+                              fontSize: 60,
                               fontWeight: FontWeight.w900,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 4.0,
-                                  color: Colors.black,
-                                  offset: Offset(2, 2),
-                                ),
+                              color: _isBust ? Colors.red : Colors.white,
+                              shadows: const [
+                                Shadow(blurRadius: 4, color: Colors.black),
                               ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 10),
                       Text(
-                        _lastHitLabel.isEmpty ? "READY" : "HIT: $_lastHitLabel",
-                        style: TextStyle(
+                        _lastHitLabel.isEmpty ? "Start" : _lastHitLabel,
+                        style: const TextStyle(
                           fontSize: 32,
-                          color: _lastHitLabel.contains("OUT")
-                              ? Colors.redAccent
-                              : Colors.cyanAccent,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                          shadows: const [
-                            Shadow(
-                              blurRadius: 10.0,
-                              color: Colors.black,
-                              offset: Offset(0, 0),
-                            ),
-                            Shadow(
-                              blurRadius: 2.0,
-                              color: Colors.black,
-                              offset: Offset(2, 2),
-                            ),
-                          ],
+                          color: Colors.cyanAccent,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(blurRadius: 4, color: Colors.black)],
                         ),
                       ),
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(3, (index) {
-                          String scoreText = index < _throwScores.length
+                          String txt = index < _throwScores.length
                               ? "${_throwScores[index]}"
                               : "-";
-                          bool isCurrent = index == _throwScores.length;
-
                           return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Container(
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.5),
                                 border: Border.all(
-                                  color: isCurrent
-                                      ? Colors.blueAccent
-                                      : Colors.white30,
+                                  color: Colors.white30,
                                   width: 2,
                                 ),
                                 borderRadius: BorderRadius.circular(50),
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                scoreText,
+                                txt,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -483,15 +400,12 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               ),
             ),
 
-            // --- Layer 3: アクションボタン (★修正: 常に表示) ---
             Positioned(
               bottom: 20,
               left: 20,
               right: 20,
               child: Row(
-                // AnimatedOpacity と IgnorePointer を削除
                 children: [
-                  // Undoボタン (1投以上ある時だけ表示)
                   if (_throwsData.isNotEmpty)
                     SizedBox(
                       width: 60,
@@ -501,19 +415,13 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[800],
                           padding: EdgeInsets.zero,
-                          elevation: 8,
-                          shadowColor: Colors.black.withValues(alpha: 0.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: Colors.white24),
-                          ),
                         ),
                         child: const Icon(Icons.undo, color: Colors.white),
                       ),
                     ),
-
-                  // NEXT ROUND ボタン (3投完了時のみ出現)
-                  if (_throwsMm.length == 3) ...[
+                  if (_throwsMm.length == 3 ||
+                      _isBust ||
+                      _currentScore == 0) ...[
                     const SizedBox(width: 10),
                     Expanded(
                       child: SizedBox(
@@ -524,16 +432,10 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                             backgroundColor: _roundCount == maxRounds
                                 ? Colors.redAccent
                                 : Colors.blueAccent,
-                            disabledBackgroundColor: Colors.grey[800]!
-                                .withValues(alpha: 0.8),
-                            elevation: 8,
-                            shadowColor: Colors.black.withValues(alpha: 0.5),
                           ),
-                          child: Text(
-                            _roundCount == maxRounds
-                                ? "SHOW RESULT"
-                                : "NEXT ROUND",
-                            style: const TextStyle(
+                          child: const Text(
+                            "NEXT ROUND",
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,

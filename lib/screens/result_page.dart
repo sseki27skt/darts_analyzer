@@ -129,6 +129,7 @@ class ResultPage extends StatelessWidget {
                       visibleDiameterMm: autoFitDiameter,
                       ringSizeMm: ringSizeMm,
                       ringLargeMm: ringLargeMm,
+                      showPracticeRings: gameMode == 0,
                       cepMm: cepMm > 0 ? cepMm : null,
                       centroidMm: centroidMm,
                     ),

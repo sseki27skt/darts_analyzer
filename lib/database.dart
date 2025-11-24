@@ -20,6 +20,7 @@ class Games extends Table {
   
   // ★追加: ゲームの種類を記録 (0: Center, 1: Count-Up)
   IntColumn get gameType => integer().withDefault(const Constant(0))(); 
+  BoolColumn get isMasterOut => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('Throw')

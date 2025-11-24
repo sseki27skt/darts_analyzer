@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'input_page.dart';
 import 'history_page.dart';
 import 'settings_page.dart';
+import 'zero_one_page.dart'; // ★追加
 
 class GameSelectionPage extends StatelessWidget {
   const GameSelectionPage({super.key});
@@ -46,18 +47,29 @@ class GameSelectionPage extends StatelessWidget {
                 context,
                 title: "CENTER COUNT-UP (練習)",
                 subtitle: "ブル集中練習モード。点数配分・リングサイズ調整可能。",
-                destination: const PrecisionInputPage(gameMode: 0), // ★モード0: Center
+                destination: const PrecisionInputPage(gameMode: 0), 
                 color: Colors.amber,
               ),
               const SizedBox(height: 16),
               
-              // ★変更: 01 GAME -> COUNT-UP (Real Scoring)
               _buildGameButton(
                 context,
                 title: "COUNT-UP (Game)",
                 subtitle: "標準的なカウントアップ。T20=60, BULL=50。",
-                destination: const PrecisionInputPage(gameMode: 1), // ★モード1: Real
+                destination: const PrecisionInputPage(gameMode: 1),
                 color: Colors.cyanAccent,
+              ),
+              
+              const SizedBox(height: 16),
+
+              // ★修正: 01 GAME (ダイアログ表示)
+              _buildGameButton(
+                context,
+                title: "01 GAME",
+                subtitle: "301〜1501。Open Out / Master Out。",
+                destination: null, 
+                onCustomPress: () => _showZeroOneDialog(context), // ダイアログを開く
+                color: Colors.blueAccent,
               ),
               
               const SizedBox(height: 16),
@@ -74,13 +86,124 @@ class GameSelectionPage extends StatelessWidget {
       ),
     );
   }
-  
-  // ... (_buildGameButton はそのまま) ...
-  Widget _buildGameButton(BuildContext context, {required String title, required String subtitle, required Widget? destination, required Color color}) {
+
+  // ★追加: 01設定ダイアログ
+  void _showZeroOneDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const ZeroOneSettingDialog(),
+    );
+  }
+
+  Widget _buildGameButton(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    Widget? destination,
+    VoidCallback? onCustomPress,
+    required Color color,
+  }) {
     return ElevatedButton(
-      onPressed: destination != null ? () => Navigator.of(context).push(MaterialPageRoute(builder: (c) => destination)) : null,
-      style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(20), backgroundColor: color.withValues(alpha: 0.1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: destination != null ? color : Colors.grey, width: 2))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: destination != null ? color : Colors.grey)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70))]),
+      onPressed: onCustomPress ?? (destination != null
+          ? () => Navigator.of(context).push(MaterialPageRoute(builder: (c) => destination))
+          : null),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.all(20),
+        backgroundColor: color.withValues(alpha: 0.1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: destination != null || onCustomPress != null ? color : Colors.grey, width: 2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: destination != null || onCustomPress != null ? color : Colors.grey)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+}
+
+// ★追加: 01設定用のステートフルウィジェット (ダイアログの中身)
+class ZeroOneSettingDialog extends StatefulWidget {
+  const ZeroOneSettingDialog({super.key});
+
+  @override
+  State<ZeroOneSettingDialog> createState() => _ZeroOneSettingDialogState();
+}
+
+class _ZeroOneSettingDialogState extends State<ZeroOneSettingDialog> {
+  int _selectedScore = 501; // デフォルト
+  int _outOption = 0; // 0: Open Out, 1: Master Out
+
+  final List<int> _scoreOptions = [301, 501, 701, 901, 1101, 1501];
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text("01 Game Settings"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // スコア選択
+          const Text("Start Score", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+          Wrap(
+            spacing: 8.0,
+            children: _scoreOptions.map((score) {
+              return ChoiceChip(
+                label: Text("$score"),
+                selected: _selectedScore == score,
+                selectedColor: Colors.blueAccent.withValues(alpha: 0.3),
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedScore = score);
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          // アウトオプション選択
+          const Text("Out Option", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+          RadioListTile<int>(
+            title: const Text("Open Out"),
+            subtitle: const Text("Finish on any number."),
+            value: 0,
+            groupValue: _outOption,
+            activeColor: Colors.blueAccent,
+            onChanged: (val) => setState(() => _outOption = val!),
+          ),
+          RadioListTile<int>(
+            title: const Text("Master Out"),
+            subtitle: const Text("Finish on Double, Triple, or Bull."),
+            value: 1,
+            groupValue: _outOption,
+            activeColor: Colors.redAccent,
+            onChanged: (val) => setState(() => _outOption = val!),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ZeroOnePage(
+                  initialScore: _selectedScore,
+                  isMasterOut: _outOption == 1,
+                ),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+          child: const Text("START", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }
