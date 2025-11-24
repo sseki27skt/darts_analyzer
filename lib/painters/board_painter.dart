@@ -6,7 +6,6 @@ class BoardPainter extends CustomPainter {
   final double visibleDiameterMm;
   final double ringSizeMm;
   final double ringLargeMm;
-  // ★削除: final double ringHalfTripleMm;
   
   final double? cepMm; 
   final Offset? centroidMm; 
@@ -16,7 +15,6 @@ class BoardPainter extends CustomPainter {
     required this.visibleDiameterMm,
     required this.ringSizeMm,
     required this.ringLargeMm,
-    // ★削除: this.ringHalfTripleMm = 107.0, 
     this.cepMm,
     this.centroidMm,
   });
@@ -168,7 +166,6 @@ class BoardPainter extends CustomPainter {
            oldDelegate.visibleDiameterMm != visibleDiameterMm ||
            oldDelegate.ringSizeMm != ringSizeMm ||
            oldDelegate.ringLargeMm != ringLargeMm ||
-           // ★削除: ringHalfTripleMm の比較を削除
            oldDelegate.cepMm != cepMm ||
            oldDelegate.centroidMm != centroidMm;
   }
