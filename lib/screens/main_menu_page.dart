@@ -47,11 +47,11 @@ class GameSelectionPage extends StatelessWidget {
                 context,
                 title: "CENTER COUNT-UP (練習)",
                 subtitle: "ブル集中練習モード。点数配分・リングサイズ調整可能。",
-                destination: const PrecisionInputPage(gameMode: 0), 
+                destination: const PrecisionInputPage(gameMode: 0),
                 color: Colors.amber,
               ),
               const SizedBox(height: 16),
-              
+
               _buildGameButton(
                 context,
                 title: "COUNT-UP (Game)",
@@ -59,7 +59,7 @@ class GameSelectionPage extends StatelessWidget {
                 destination: const PrecisionInputPage(gameMode: 1),
                 color: Colors.cyanAccent,
               ),
-              
+
               const SizedBox(height: 16),
 
               // ★修正: 01 GAME (ダイアログ表示)
@@ -67,17 +67,17 @@ class GameSelectionPage extends StatelessWidget {
                 context,
                 title: "01 GAME",
                 subtitle: "301〜1501。Open Out / Master Out。",
-                destination: null, 
+                destination: null,
                 onCustomPress: () => _showZeroOneDialog(context), // ダイアログを開く
                 color: Colors.blueAccent,
               ),
-              
+
               const SizedBox(height: 16),
               _buildGameButton(
                 context,
                 title: "CRICKET COUNT (今後実装)",
                 subtitle: "クリケットナンバーのグルーピング練習。",
-                destination: null, 
+                destination: null,
                 color: Colors.greenAccent,
               ),
             ],
@@ -104,25 +104,49 @@ class GameSelectionPage extends StatelessWidget {
     required Color color,
   }) {
     return ElevatedButton(
-      onPressed: onCustomPress ?? (destination != null
-          ? () => Navigator.of(context).push(MaterialPageRoute(builder: (c) => destination))
-          : null),
+      onPressed:
+          onCustomPress ??
+          (destination != null
+              ? () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (c) => destination))
+              : null),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.all(20),
         backgroundColor: color.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: destination != null || onCustomPress != null ? color : Colors.grey, width: 2),
+          side: BorderSide(
+            color: destination != null || onCustomPress != null
+                ? color
+                : Colors.grey,
+            width: 2,
+          ),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // 縦方向も中央に
+        crossAxisAlignment: CrossAxisAlignment.center, // 横方向を中央に！(ここが重要)
         children: [
-          Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: destination != null || onCustomPress != null ? color : Colors.grey)),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: destination != null || onCustomPress != null
+                  ? color
+                  : Colors.grey,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
         ],
-      ),
+      )
     );
   }
 }
@@ -149,7 +173,13 @@ class _ZeroOneSettingDialogState extends State<ZeroOneSettingDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // スコア選択
-          const Text("Start Score", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+          const Text(
+            "Start Score",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blueAccent,
+            ),
+          ),
           Wrap(
             spacing: 8.0,
             children: _scoreOptions.map((score) {
@@ -166,7 +196,13 @@ class _ZeroOneSettingDialogState extends State<ZeroOneSettingDialog> {
           const SizedBox(height: 20),
 
           // アウトオプション選択
-          const Text("Out Option", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+          const Text(
+            "Out Option",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
+          ),
           RadioListTile<int>(
             title: const Text("Open Out"),
             subtitle: const Text("Finish on any number."),
@@ -186,7 +222,10 @@ class _ZeroOneSettingDialogState extends State<ZeroOneSettingDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(context);
@@ -201,7 +240,10 @@ class _ZeroOneSettingDialogState extends State<ZeroOneSettingDialog> {
             );
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-          child: const Text("START", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          child: const Text(
+            "START",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
