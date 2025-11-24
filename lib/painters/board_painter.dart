@@ -6,17 +6,17 @@ class BoardPainter extends CustomPainter {
   final double visibleDiameterMm;
   final double ringSizeMm;
   final double ringLargeMm;
-  final double ringHalfTripleMm; 
+  // ★削除: final double ringHalfTripleMm;
   
   final double? cepMm; 
-  final Offset? centroidMm;
+  final Offset? centroidMm; 
 
   BoardPainter({
     required this.throwsMm,
     required this.visibleDiameterMm,
     required this.ringSizeMm,
     required this.ringLargeMm,
-    this.ringHalfTripleMm = 107.0, 
+    // ★削除: this.ringHalfTripleMm = 107.0, 
     this.cepMm,
     this.centroidMm,
   });
@@ -35,6 +35,7 @@ class BoardPainter extends CustomPainter {
 
     final Paint segmentPaint = Paint()..style = PaintingStyle.stroke..strokeCap = StrokeCap.butt;
 
+    // 背景
     canvas.drawCircle(center, (rDoubleOut + 20) * scalePxPerMm, Paint()..color = const Color(0xFF101010));
 
     const double segmentAngle = 2 * pi / 20;
@@ -63,6 +64,7 @@ class BoardPainter extends CustomPainter {
       drawSegmentWithBits(rTripleIn, rBullOut, colorSingle);
     }
 
+    // スパイダー
     final Paint spiderPaint = Paint()..color = Colors.white12..style = PaintingStyle.stroke..strokeWidth = 0.5;
     for (int i = 0; i < 20; i++) {
       double angle = startOffset + (i * segmentAngle);
@@ -82,16 +84,14 @@ class BoardPainter extends CustomPainter {
     ringPaint.strokeWidth = 1.0;
     canvas.drawCircle(center, (ringLargeMm / 2) * scalePxPerMm, ringPaint);
     
-    // Half-Triple Ring (Cyanで少し目立たせる)
-    ringPaint.color = Colors.cyanAccent.withValues(alpha: 0.4); 
-    ringPaint.strokeWidth = 1.0;
-    canvas.drawCircle(center, (ringHalfTripleMm / 2) * scalePxPerMm, ringPaint);
+    // ★削除: Half-Triple Ring (水色の環) の描画を削除
 
     // Ring Small
     ringPaint.color = const Color.fromRGBO(255, 115, 0, 0.8); 
     ringPaint.strokeWidth = 1.5;
     canvas.drawCircle(center, (ringSizeMm / 2) * scalePxPerMm, ringPaint);
 
+    // ブルエリア
     final Paint fillPaint = Paint()..style = PaintingStyle.fill;
     fillPaint.color = const Color(0xFF661010);
     canvas.drawCircle(center, rBullOut * scalePxPerMm, fillPaint);
@@ -105,7 +105,7 @@ class BoardPainter extends CustomPainter {
 
     if (cepMm != null && centroidMm != null) {
       Offset cPos = center + (centroidMm! * scalePxPerMm);
-      final Paint cepPaint = Paint()..style = PaintingStyle.fill..color = Colors.greenAccent.withValues(alpha: 0.2);
+      final Paint cepPaint = Paint()..style = PaintingStyle.fill..color = Colors.greenAccent.withOpacity(0.2);
       canvas.drawCircle(cPos, cepMm! * scalePxPerMm, cepPaint);
       cepPaint..style = PaintingStyle.stroke..color = Colors.greenAccent..strokeWidth = 1.5;
       canvas.drawCircle(cPos, cepMm! * scalePxPerMm, cepPaint);
@@ -123,9 +123,9 @@ class BoardPainter extends CustomPainter {
       canvas.drawCircle(drawPos, 4, pointStroke);
     }
   }
-
+  
   void _drawBits(Canvas canvas, Offset center, double startAngle, double sweepAngle, double rInnerPx, double rOuterPx, Color baseColor) {
-     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withValues(alpha: 0.5);
+     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withOpacity(0.5);
     final Paint bitPaint = Paint()..color = bitColor..style = PaintingStyle.fill;
     const double bitRadiusPx = 1.5; 
     const double rStepPx = 5.0;
@@ -144,7 +144,7 @@ class BoardPainter extends CustomPainter {
   }
 
   void _drawBitsCircle(Canvas canvas, Offset center, double rInnerPx, double rOuterPx, Color baseColor) {
-     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!. withValues(alpha: 0.5);
+     final Color bitColor = Color.lerp(baseColor, Colors.black, 0.4)!.withOpacity(0.5);
     final Paint bitPaint = Paint()..color = bitColor..style = PaintingStyle.fill;
     const double bitRadiusPx = 1.5;
     const double rStepPx = 5.0;
@@ -168,7 +168,7 @@ class BoardPainter extends CustomPainter {
            oldDelegate.visibleDiameterMm != visibleDiameterMm ||
            oldDelegate.ringSizeMm != ringSizeMm ||
            oldDelegate.ringLargeMm != ringLargeMm ||
-           oldDelegate.ringHalfTripleMm != ringHalfTripleMm ||
+           // ★削除: ringHalfTripleMm の比較を削除
            oldDelegate.cepMm != cepMm ||
            oldDelegate.centroidMm != centroidMm;
   }

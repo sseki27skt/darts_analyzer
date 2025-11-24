@@ -21,20 +21,18 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // --- 状態変数定義 ---
   late double _ringSizeMm;
   late double _ringLargeMm;
   
-  // キャリブレーションとモード
-  double _ringHalfTripleMm = 107.0; 
+  // ★削除: double _ringHalfTripleMm = 107.0; 
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
   int _scoreLarge = 2;
-  int _scoreHalfTriple = 1;
-  int _scoreArea = 0;
-  int _boundaryType = 0; 
-  // ---
+  // ★削除: int _scoreHalfTriple = 1;
+  int _scoreArea = 1; // デフォルト1点
+  int _boundaryType = 1; // デフォルト: Triple Inner
+  int _scoringMode = 0; 
 
   @override
   void initState() {
@@ -49,16 +47,16 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       _ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
-
-      _ringHalfTripleMm = prefs.getDouble('ring_half_triple_mm') ?? 107.0;
+      // ★削除: _ringHalfTripleMm
 
       _scoreInner = prefs.getInt('score_inner') ?? 5;
       _scoreOuter = prefs.getInt('score_outer') ?? 4;
       _scoreSmall = prefs.getInt('score_small') ?? 3;
       _scoreLarge = prefs.getInt('score_large') ?? 2;
-      _scoreHalfTriple = prefs.getInt('score_half_triple') ?? 1;
-      _scoreArea = prefs.getInt('score_area') ?? 0;
-      _boundaryType = prefs.getInt('boundary_type') ?? 0; 
+      // ★削除: _scoreHalfTriple
+      _scoreArea = prefs.getInt('score_area') ?? 1;
+      _boundaryType = prefs.getInt('boundary_type') ?? 1; 
+      _scoringMode = prefs.getInt('scoring_mode') ?? 0; 
     });
   }
 
@@ -66,16 +64,16 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('ring_size_mm', _ringSizeMm);
     await prefs.setDouble('ring_large_mm', _ringLargeMm);
-    
-    await prefs.setDouble('ring_half_triple_mm', _ringHalfTripleMm);
+    // ★削除: ring_half_triple_mm
 
     await prefs.setInt('score_inner', _scoreInner);
     await prefs.setInt('score_outer', _scoreOuter);
     await prefs.setInt('score_small', _scoreSmall);
     await prefs.setInt('score_large', _scoreLarge);
-    await prefs.setInt('score_half_triple', _scoreHalfTriple);
+    // ★削除: score_half_triple
     await prefs.setInt('score_area', _scoreArea);
     await prefs.setInt('boundary_type', _boundaryType);
+    await prefs.setInt('scoring_mode', _scoringMode); 
 
     if (mounted) {
       Navigator.of(context).pop({
@@ -87,7 +85,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ----------------------------------------
-  // ★★★ データ管理ロジック (修正版) ★★★
+  // データ管理ロジック
   // ----------------------------------------
 
   Future<void> _exportData() async {
@@ -104,7 +102,6 @@ class _SettingsPageState extends State<SettingsPage> {
           'x': t.x,
           'y': t.y,
           'orderIndex': t.orderIndex,
-          // ★追加: ラベル情報もエクスポート
           'segmentLabel': t.segmentLabel,
         });
       }
@@ -121,6 +118,7 @@ class _SettingsPageState extends State<SettingsPage> {
             'sdY': game.sdY,
             'ringSizeMm': game.ringSizeMm,
             'ringLargeMm': game.ringLargeMm,
+            'gameType': game.gameType,
           },
           'points': throwsByGame[game.id] ?? [],
         });
@@ -188,6 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
             sdY: (meta['sdY'] as num).toDouble(),
             ringSizeMm: (meta['ringSizeMm'] as num).toDouble(),
             ringLargeMm: (meta['ringLargeMm'] as num?)?.toDouble() ?? 83.0,
+            gameType: drift.Value(meta['gameType'] as int? ?? 0),
           ));
 
           for (final p in points) {
@@ -196,7 +195,6 @@ class _SettingsPageState extends State<SettingsPage> {
               x: (p['x'] as num).toDouble(),
               y: (p['y'] as num).toDouble(),
               orderIndex: p['orderIndex'],
-              // ★追加: ラベル情報を復元 (ない場合は空文字)
               segmentLabel: drift.Value(p['segmentLabel'] ?? ''),
             ));
           }
@@ -276,6 +274,7 @@ class _SettingsPageState extends State<SettingsPage> {
           sdY: sdY,
           ringSizeMm: _ringSizeMm,
           ringLargeMm: _ringLargeMm,
+          gameType: drift.Value(0), // Center mode
         ));
 
         for(int j=0; j<3; j++) {
@@ -284,7 +283,6 @@ class _SettingsPageState extends State<SettingsPage> {
             x: dummyPoints[j].dx,
             y: dummyPoints[j].dy,
             orderIndex: j,
-            // ★追加: ダミーデータにもラベルを入れる
             segmentLabel: drift.Value("DEBUG"), 
           ));
         }
@@ -348,16 +346,31 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text("Scoring Rules (Center Mode)", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber)),
+              const SizedBox(height: 10),
+
+              // --- Boundary Setting ---
+              const Text("Valid Board Area (Out Boundary)", style: TextStyle(fontWeight: FontWeight.bold)),
+              DropdownButton<int>(
+                value: _boundaryType,
+                isExpanded: true,
+                dropdownColor: Colors.grey[800],
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text("Outside Double Ring (> 340mm)")),
+                  DropdownMenuItem(value: 1, child: Text("Inside Triple Ring (< 198mm)")), // ★修正: 内径
+                  // Half-Triple は削除
+                ],
+                onChanged: (val) => setState(() => _boundaryType = val!),
+              ),
+              const SizedBox(height: 20),
               
               _buildScoreInput("Inner Bull (< 8mm)", _scoreInner, (v) => _scoreInner = v),
               _buildScoreInput("Outer Bull (< 22mm)", _scoreOuter, (v) => _scoreOuter = v),
               _buildScoreInput("Small Ring", _scoreSmall, (v) => _scoreSmall = v),
               _buildScoreInput("Large Ring", _scoreLarge, (v) => _scoreLarge = v),
-              _buildScoreInput("Half-Triple Ring", _scoreHalfTriple, (v) => _scoreHalfTriple = v),
+              // Half-Triple Input は削除
               _buildScoreInput("Other Valid Area", _scoreArea, (v) => _scoreArea = v),
 
               const Divider(height: 40, thickness: 1, color: Colors.white24),
-
 
               const Text("Calibration", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
@@ -368,8 +381,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Text("Large Ring: ${_ringLargeMm.toStringAsFixed(1)} mm"),
               Slider(value: _ringLargeMm, min: 40.0, max: 200.0, divisions: 160, label: "${_ringLargeMm.toStringAsFixed(1)} mm", onChanged: (val) => setState(() => _ringLargeMm = val)),
 
-              Text("Half-Triple Ring: ${_ringHalfTripleMm.toStringAsFixed(1)} mm"),
-              Slider(value: _ringHalfTripleMm, min: 80.0, max: 220.0, divisions: 140, label: "${_ringHalfTripleMm.toStringAsFixed(1)} mm", activeColor: Colors.cyanAccent, onChanged: (val) => setState(() => _ringHalfTripleMm = val)),
+              // Half-Triple Slider は削除
               
               const Divider(height: 40, thickness: 1, color: Colors.white24),
 

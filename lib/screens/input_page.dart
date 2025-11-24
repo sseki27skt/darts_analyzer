@@ -29,14 +29,12 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   double visibleDiameterMm = 160.0;
   double ringSizeMm = 63.0;
   double ringLargeMm = 83.0;
-  double ringHalfTripleMm = 107.0;
   late int _scoringMode;
 
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
   int _scoreLarge = 2;
-  int _scoreHalfTriple = 1;
   int _scoreArea = 0;
   double _outBoundaryMm = 340.0;
 
@@ -70,13 +68,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     setState(() {
       ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
-      ringHalfTripleMm = prefs.getDouble('ring_half_triple_mm') ?? 107.0;
 
       _scoreInner = prefs.getInt('score_inner') ?? 5;
       _scoreOuter = prefs.getInt('score_outer') ?? 4;
       _scoreSmall = prefs.getInt('score_small') ?? 3;
       _scoreLarge = prefs.getInt('score_large') ?? 2;
-      _scoreHalfTriple = prefs.getInt('score_half_triple') ?? 1;
       _scoreArea = prefs.getInt('score_area') ?? 0;
 
       int boundaryType = prefs.getInt('boundary_type') ?? 0;
@@ -85,11 +81,9 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
           _outBoundaryMm = 340.0;
           break;
         case 1:
-          _outBoundaryMm = 214.0;
+          _outBoundaryMm = 198.0;
           break;
-        case 2:
-          _outBoundaryMm = ringHalfTripleMm;
-          break;
+
         default:
           _outBoundaryMm = 340.0;
       }
@@ -103,7 +97,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     if (distanceMm <= 22.0) return _scoreOuter;
     if (distanceMm <= ringSizeMm / 2) return _scoreSmall;
     if (distanceMm <= ringLargeMm / 2) return _scoreLarge;
-    if (distanceMm <= ringHalfTripleMm / 2) return _scoreHalfTriple;
     return _scoreArea;
   }
 
@@ -363,7 +356,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                                   visibleDiameterMm: visibleDiameterMm,
                                   ringSizeMm: ringSizeMm,
                                   ringLargeMm: ringLargeMm,
-                                  ringHalfTripleMm: ringHalfTripleMm,
                                 ),
                               ),
                             ),
