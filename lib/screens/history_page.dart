@@ -3,7 +3,7 @@ import 'package:drift/drift.dart' as drift;
 import '../database.dart';
 import 'result_page.dart';
 import 'graph_page.dart';
-import 'package:intl/intl.dart'; // 日付フォーマット用
+// 日付フォーマット用
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});

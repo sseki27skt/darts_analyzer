@@ -273,8 +273,9 @@ class _ZeroOnePageState extends State<ZeroOnePage> {
                       onScaleStart: (details) =>
                           _baseVisibleDiameter = visibleDiameterMm,
                       onScaleUpdate: (details) {
-                        if (details.scale != 1.0)
+                        if (details.scale != 1.0) {
                           _handleZoomUpdate(details.scale);
+                        }
                         setState(() => _boardOffset += details.focalPointDelta);
                       },
                       onLongPress: () {

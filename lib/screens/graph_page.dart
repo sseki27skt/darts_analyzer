@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:drift/drift.dart' as drift; // クエリ用 (whereなどで使う可能性があるため残す)
+// クエリ用 (whereなどで使う可能性があるため残す)
 import '../database.dart';
 
 class GraphPage extends StatefulWidget {
