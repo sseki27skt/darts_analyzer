@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' as drift;
 import '../database.dart';
 import '../painters/board_painter.dart';
 import 'result_page.dart';
-import '../utils/score_engine.dart'; 
-import 'package:flutter/gestures.dart'; 
+import '../utils/score_engine.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart'; // HapticFeedback用
 
-// データ構造
 class ThrowData {
   final Offset positionMm;
   final int score;
@@ -31,8 +30,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   double ringSizeMm = 63.0;
   double ringLargeMm = 83.0;
   double ringHalfTripleMm = 107.0;
-  late int _scoringMode; 
-  
+  late int _scoringMode;
+
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
@@ -41,24 +40,22 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   int _scoreArea = 0;
   double _outBoundaryMm = 340.0;
 
-  final List<ThrowData> _throwsData = []; 
-  final List<Offset> _throwsMm = []; 
+  final List<ThrowData> _throwsData = [];
+  final List<Offset> _throwsMm = [];
   final List<int> _throwScores = [];
-  final List<ThrowData> _gameHistoryData = []; 
+  final List<ThrowData> _gameHistoryData = [];
 
   int _currentScore = 0;
   int _roundCount = 1;
   static const int maxRounds = 8;
   String _lastHitLabel = "";
-  
-  double _baseVisibleDiameter = 160.0; 
-  static const double minZoomMm = 160.0; 
-  static const double maxZoomMm = 400.0; 
 
-  // UIの表示状態 (true: 表示, false: 非表示)
-  bool _isUiVisible = true; 
+  double _baseVisibleDiameter = 160.0;
+  static const double minZoomMm = 160.0;
+  static const double maxZoomMm = 400.0;
 
-  // ボードの移動量（オフセット）
+  // ★追加: UIの表示状態
+  bool _isUiVisible = true;
   Offset _boardOffset = Offset.zero;
 
   @override
@@ -81,13 +78,20 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _scoreLarge = prefs.getInt('score_large') ?? 2;
       _scoreHalfTriple = prefs.getInt('score_half_triple') ?? 1;
       _scoreArea = prefs.getInt('score_area') ?? 0;
-      
+
       int boundaryType = prefs.getInt('boundary_type') ?? 0;
       switch (boundaryType) {
-        case 0: _outBoundaryMm = 340.0; break;
-        case 1: _outBoundaryMm = 214.0; break;
-        case 2: _outBoundaryMm = ringHalfTripleMm; break;
-        default: _outBoundaryMm = 340.0;
+        case 0:
+          _outBoundaryMm = 340.0;
+          break;
+        case 1:
+          _outBoundaryMm = 214.0;
+          break;
+        case 2:
+          _outBoundaryMm = ringHalfTripleMm;
+          break;
+        default:
+          _outBoundaryMm = 340.0;
       }
       _baseVisibleDiameter = visibleDiameterMm;
     });
@@ -97,7 +101,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     if (distanceMm > _outBoundaryMm / 2) return 0;
     if (distanceMm <= 8.0) return _scoreInner;
     if (distanceMm <= 22.0) return _scoreOuter;
-    if (distanceMm <= ringSizeMm / 2) return _scoreSmall; 
+    if (distanceMm <= ringSizeMm / 2) return _scoreSmall;
     if (distanceMm <= ringLargeMm / 2) return _scoreLarge;
     if (distanceMm <= ringHalfTripleMm / 2) return _scoreHalfTriple;
     return _scoreArea;
@@ -122,12 +126,15 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     }
   }
 
-  void _handleTap(TapUpDetails details, BoxConstraints constraints, double boardSizePx) {
+  void _handleTap(
+    TapUpDetails details,
+    BoxConstraints constraints,
+    double boardSizePx,
+  ) {
     if (_throwsMm.length >= 3) return;
 
     final double centerX = constraints.maxWidth / 2;
     final double centerY = constraints.maxHeight / 2;
-    
     final Offset localPos = details.localPosition;
 
     final Offset relativePx = Offset(
@@ -136,13 +143,12 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     );
 
     double scale = visibleDiameterMm / boardSizePx;
-    
     Offset posMm = relativePx * scale;
     double distanceMm = posMm.distance;
 
     final realResult = DartsScoreEngine.calculate(posMm);
     String label = realResult['label'];
-    int realScore = realResult['score']; 
+    int realScore = realResult['score'];
 
     setState(() {
       int pts = 0;
@@ -154,8 +160,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
       final newThrow = ThrowData(posMm, pts, label);
       _throwsData.add(newThrow);
-      _throwsMm.add(posMm); 
-
+      _throwsMm.add(posMm);
       _throwScores.add(pts);
       _currentScore += pts;
       _lastHitLabel = label;
@@ -164,13 +169,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   void _undo() {
     if (_throwsData.isEmpty) return;
-
     setState(() {
       final removed = _throwsData.removeLast();
       _throwsMm.removeLast();
       _throwScores.removeLast();
       _currentScore -= removed.score;
-
       if (_throwsData.isNotEmpty) {
         _lastHitLabel = _throwsData.last.label;
       } else {
@@ -180,17 +183,20 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   }
 
   void _nextRound() {
-    _gameHistoryData.addAll(_throwsData); 
+    _gameHistoryData.addAll(_throwsData);
     setState(() {
       if (_roundCount < maxRounds) {
         _roundCount++;
-        _throwsData.clear(); 
+        _throwsData.clear();
         _throwsMm.clear();
         _throwScores.clear();
-        _lastHitLabel = ""; 
+        _lastHitLabel = "";
       } else {
         double sumX = 0, sumY = 0;
-        for (var p in _gameHistoryData) { sumX += p.positionMm.dx; sumY += p.positionMm.dy; }
+        for (var p in _gameHistoryData) {
+          sumX += p.positionMm.dx;
+          sumY += p.positionMm.dy;
+        }
         double meanX = sumX / _gameHistoryData.length;
         double meanY = sumY / _gameHistoryData.length;
 
@@ -202,44 +208,62 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         double sdX = sqrt(sumSqDiffX / _gameHistoryData.length);
         double sdY = sqrt(sumSqDiffY / _gameHistoryData.length);
 
-        final pointsToSave = List<ThrowData>.from(_gameHistoryData); 
+        final pointsToSave = List<ThrowData>.from(_gameHistoryData);
         final scoreToSave = _currentScore;
 
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ResultPage(
-              gameHistoryMm: _gameHistoryData.map((e) => e.positionMm).toList(),
-              totalScore: scoreToSave,
-              visibleDiameterMm: visibleDiameterMm,
-              ringSizeMm: ringSizeMm,
-              ringLargeMm: ringLargeMm,
-              gameMode: _scoringMode, 
-            ),
-          ),
-        ).then((_) {
-          _saveGameResult(scoreToSave, meanX, meanY, sdX, sdY, pointsToSave); 
-          _resetGame();
-        });
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (context) => ResultPage(
+                  gameHistoryMm: _gameHistoryData
+                      .map((e) => e.positionMm)
+                      .toList(),
+                  totalScore: scoreToSave,
+                  visibleDiameterMm: visibleDiameterMm,
+                  ringSizeMm: ringSizeMm,
+                  ringLargeMm: ringLargeMm,
+                  gameMode: _scoringMode,
+                ),
+              ),
+            )
+            .then((_) {
+              _saveGameResult(
+                scoreToSave,
+                meanX,
+                meanY,
+                sdX,
+                sdY,
+                pointsToSave,
+              );
+              _resetGame();
+            });
       }
     });
   }
 
   Future<void> _saveGameResult(
-    int score, 
-    double mx, double my, double sdx, double sdy,
-    List<ThrowData> pointsToSave, 
+    int score,
+    double mx,
+    double my,
+    double sdx,
+    double sdy,
+    List<ThrowData> pointsToSave,
   ) async {
-    final gameId = await database.into(database.games).insert(GamesCompanion.insert(
-      date: DateTime.now(),
-      score: score,
-      meanX: mx,
-      meanY: my,
-      sdX: sdx,
-      sdY: sdy,
-      ringSizeMm: ringSizeMm,
-      ringLargeMm: ringLargeMm,
-      gameType: drift.Value(_scoringMode),
-    ));
+    final gameId = await database
+        .into(database.games)
+        .insert(
+          GamesCompanion.insert(
+            date: DateTime.now(),
+            score: score,
+            meanX: mx,
+            meanY: my,
+            sdX: sdx,
+            sdY: sdy,
+            ringSizeMm: ringSizeMm,
+            ringLargeMm: ringLargeMm,
+            gameType: drift.Value(_scoringMode),
+          ),
+        );
 
     await database.batch((batch) {
       for (int i = 0; i < pointsToSave.length; i++) {
@@ -248,8 +272,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
           database.throws,
           ThrowsCompanion.insert(
             gameId: gameId,
-            x: p.positionMm.dx, 
-            y: p.positionMm.dy, 
+            x: p.positionMm.dx,
+            y: p.positionMm.dy,
             orderIndex: i,
             segmentLabel: drift.Value(p.label),
           ),
@@ -260,24 +284,25 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   void _resetGame() {
     setState(() {
-      _gameHistoryData.clear(); 
-      _throwsData.clear();     
+      _gameHistoryData.clear();
+      _throwsData.clear();
       _throwsMm.clear();
       _throwScores.clear();
       _currentScore = 0;
       _roundCount = 1;
       _lastHitLabel = "";
-      
-      visibleDiameterMm = minZoomMm; 
-      _baseVisibleDiameter = minZoomMm; 
+      visibleDiameterMm = minZoomMm;
+      _baseVisibleDiameter = minZoomMm;
       _boardOffset = Offset.zero;
     });
   }
 
+  // lib/screens/input_page.dart の build メソッド部分
+
   @override
   Widget build(BuildContext context) {
     String title = _scoringMode == 0 ? 'Center Count-Up' : 'Count-Up';
-    
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
@@ -293,12 +318,15 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  double availableSize = min(constraints.maxWidth, constraints.maxHeight);
-                  
-                  return Listener( 
+                  double availableSize = min(
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  );
+
+                  return Listener(
                     onPointerSignal: _handleScrollZoom,
-                    child: GestureDetector( 
-                      behavior: HitTestBehavior.translucent, 
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
                       onScaleStart: (details) {
                         _baseVisibleDiameter = visibleDiameterMm;
                       },
@@ -310,17 +338,19 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           _boardOffset += details.focalPointDelta;
                         });
                       },
+                      // 長押しで「スコア表示」のON/OFF切り替え
                       onLongPress: () {
                         setState(() {
                           _isUiVisible = !_isUiVisible;
                         });
                         HapticFeedback.mediumImpact();
                       },
-                      onTapUp: (details) => _handleTap(details, constraints, availableSize),
-                      
+                      onTapUp: (details) =>
+                          _handleTap(details, constraints, availableSize),
+
                       child: ClipRect(
                         child: Container(
-                          color: Colors.transparent, 
+                          color: Colors.transparent,
                           width: constraints.maxWidth,
                           height: constraints.maxHeight,
                           child: Center(
@@ -346,9 +376,11 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               ),
             ),
 
-            // --- Layer 2: スコア情報 ---
+            // --- Layer 2: スコア情報 (長押しで消える) ---
             Positioned(
-              top: 10, left: 20, right: 20,
+              top: 10,
+              left: 20,
+              right: 20,
               child: AnimatedOpacity(
                 opacity: _isUiVisible ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
@@ -362,19 +394,31 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           Text(
                             "ROUND $_roundCount / $maxRounds",
                             style: const TextStyle(
-                              color: Colors.amber, 
+                              color: Colors.amber,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
-                              shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
-                            )
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 4.0,
+                                  color: Colors.black,
+                                  offset: Offset(2, 2),
+                                ),
+                              ],
+                            ),
                           ),
                           Text(
                             "Total: $_currentScore",
                             style: const TextStyle(
-                              fontSize: 24, 
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
-                            )
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 4.0,
+                                  color: Colors.black,
+                                  offset: Offset(2, 2),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -382,43 +426,60 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                       Text(
                         _lastHitLabel.isEmpty ? "READY" : "HIT: $_lastHitLabel",
                         style: TextStyle(
-                          fontSize: 32, 
-                          color: _lastHitLabel.contains("OUT") ? Colors.redAccent : Colors.cyanAccent, 
-                          fontWeight: FontWeight.w900, 
+                          fontSize: 32,
+                          color: _lastHitLabel.contains("OUT")
+                              ? Colors.redAccent
+                              : Colors.cyanAccent,
+                          fontWeight: FontWeight.w900,
                           letterSpacing: 2.0,
                           shadows: const [
-                            Shadow(blurRadius: 10.0, color: Colors.black, offset: Offset(0, 0)),
-                            Shadow(blurRadius: 2.0, color: Colors.black, offset: Offset(2, 2))
-                          ]
+                            Shadow(
+                              blurRadius: 10.0,
+                              color: Colors.black,
+                              offset: Offset(0, 0),
+                            ),
+                            Shadow(
+                              blurRadius: 2.0,
+                              color: Colors.black,
+                              offset: Offset(2, 2),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(3, (index) {
-                          String scoreText = index < _throwScores.length ? "${_throwScores[index]}" : "-";
+                          String scoreText = index < _throwScores.length
+                              ? "${_throwScores[index]}"
+                              : "-";
                           bool isCurrent = index == _throwScores.length;
-                          
+
                           return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0), 
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                            ),
                             child: Container(
-                              width: 44, height: 44, 
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5), 
+                                color: Colors.black.withValues(alpha: 0.5),
                                 border: Border.all(
-                                  color: isCurrent ? Colors.blueAccent : Colors.white30, 
-                                  width: 2
+                                  color: isCurrent
+                                      ? Colors.blueAccent
+                                      : Colors.white30,
+                                  width: 2,
                                 ),
                                 borderRadius: BorderRadius.circular(50),
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                scoreText, 
+                                scoreText,
                                 style: const TextStyle(
-                                  fontSize: 18, 
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white
-                                )
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           );
@@ -430,61 +491,67 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               ),
             ),
 
-            // --- Layer 3: アクションボタン ---
+            // --- Layer 3: アクションボタン (★修正: 常に表示) ---
             Positioned(
-              bottom: 20, left: 20, right: 20,
-              child: AnimatedOpacity(
-                opacity: _isUiVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: IgnorePointer(
-                  ignoring: !_isUiVisible, 
-                  child: Row(
-                    children: [
-                      // ★修正: 1投以上ある時だけUndoボタンを表示
-                      if (_throwsData.isNotEmpty)
-                        SizedBox(
-                          width: 60, height: 50,
-                          child: ElevatedButton(
-                            onPressed: _undo, 
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey[800],
-                              padding: EdgeInsets.zero,
-                              elevation: 8,
-                              shadowColor: Colors.black.withValues(alpha: 0.5),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Colors.white24),
-                              ),
-                            ),
-                            child: const Icon(Icons.undo, color: Colors.white),
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Row(
+                // AnimatedOpacity と IgnorePointer を削除
+                children: [
+                  // Undoボタン (1投以上ある時だけ表示)
+                  if (_throwsData.isNotEmpty)
+                    SizedBox(
+                      width: 60,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _undo,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[800],
+                          padding: EdgeInsets.zero,
+                          elevation: 8,
+                          shadowColor: Colors.black.withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: Colors.white24),
                           ),
                         ),
+                        child: const Icon(Icons.undo, color: Colors.white),
+                      ),
+                    ),
 
-                      // NEXT ROUND ボタン (3投完了時のみ出現)
-                      if (_throwsMm.length == 3) ...[
-                        const SizedBox(width: 10), 
-                        Expanded(
-                          child: SizedBox(
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _nextRound,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _roundCount == maxRounds ? Colors.redAccent : Colors.blueAccent,
-                                disabledBackgroundColor: Colors.grey[800]!.withValues(alpha: 0.8),
-                                elevation: 8,
-                                shadowColor: Colors.black.withValues(alpha: 0.5),
-                              ),
-                              child: Text(
-                                _roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", 
-                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
-                              ),
+                  // NEXT ROUND ボタン (3投完了時のみ出現)
+                  if (_throwsMm.length == 3) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _nextRound,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _roundCount == maxRounds
+                                ? Colors.redAccent
+                                : Colors.blueAccent,
+                            disabledBackgroundColor: Colors.grey[800]!
+                                .withValues(alpha: 0.8),
+                            elevation: 8,
+                            shadowColor: Colors.black.withValues(alpha: 0.5),
+                          ),
+                          child: Text(
+                            _roundCount == maxRounds
+                                ? "SHOW RESULT"
+                                : "NEXT ROUND",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
