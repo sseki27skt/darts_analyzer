@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' as drift;
@@ -53,6 +54,12 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   double _baseVisibleDiameter = 160.0; 
   static const double minZoomMm = 160.0; 
   static const double maxZoomMm = 400.0; 
+
+  // UIの表示状態 (true: 表示, false: 非表示)
+  bool _isUiVisible = true; 
+
+  // ボードの移動量（オフセット）
+  Offset _boardOffset = Offset.zero;
 
   @override
   void initState() {
@@ -124,8 +131,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     final Offset localPos = details.localPosition;
 
     final Offset relativePx = Offset(
-      localPos.dx - centerX,
-      localPos.dy - centerY,
+      localPos.dx - centerX - _boardOffset.dx,
+      localPos.dy - centerY - _boardOffset.dy,
     );
 
     double scale = visibleDiameterMm / boardSizePx;
@@ -152,6 +159,23 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _throwScores.add(pts);
       _currentScore += pts;
       _lastHitLabel = label;
+    });
+  }
+
+  void _undo() {
+    if (_throwsData.isEmpty) return;
+
+    setState(() {
+      final removed = _throwsData.removeLast();
+      _throwsMm.removeLast();
+      _throwScores.removeLast();
+      _currentScore -= removed.score;
+
+      if (_throwsData.isNotEmpty) {
+        _lastHitLabel = _throwsData.last.label;
+      } else {
+        _lastHitLabel = "";
+      }
     });
   }
 
@@ -232,7 +256,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         );
       }
     });
-    // print文を削除
   }
 
   void _resetGame() {
@@ -244,8 +267,10 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _currentScore = 0;
       _roundCount = 1;
       _lastHitLabel = "";
+      
       visibleDiameterMm = minZoomMm; 
       _baseVisibleDiameter = minZoomMm; 
+      _boardOffset = Offset.zero;
     });
   }
 
@@ -257,7 +282,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(title),
-        // ★修正: withOpacity -> withValues
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         actions: const [],
@@ -282,6 +306,15 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                         if (details.scale != 1.0) {
                           _handleZoomUpdate(details.scale);
                         }
+                        setState(() {
+                          _boardOffset += details.focalPointDelta;
+                        });
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          _isUiVisible = !_isUiVisible;
+                        });
+                        HapticFeedback.mediumImpact();
                       },
                       onTapUp: (details) => _handleTap(details, constraints, availableSize),
                       
@@ -291,14 +324,17 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           width: constraints.maxWidth,
                           height: constraints.maxHeight,
                           child: Center(
-                            child: CustomPaint(
-                              size: Size(availableSize, availableSize),
-                              painter: BoardPainter(
-                                throwsMm: _throwsMm,
-                                visibleDiameterMm: visibleDiameterMm,
-                                ringSizeMm: ringSizeMm,
-                                ringLargeMm: ringLargeMm,
-                                ringHalfTripleMm: ringHalfTripleMm,
+                            child: Transform.translate(
+                              offset: _boardOffset,
+                              child: CustomPaint(
+                                size: Size(availableSize, availableSize),
+                                painter: BoardPainter(
+                                  throwsMm: _throwsMm,
+                                  visibleDiameterMm: visibleDiameterMm,
+                                  ringSizeMm: ringSizeMm,
+                                  ringLargeMm: ringLargeMm,
+                                  ringHalfTripleMm: ringHalfTripleMm,
+                                ),
                               ),
                             ),
                           ),
@@ -310,82 +346,86 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
               ),
             ),
 
-            // --- Layer 2: スコア情報 (IgnorePointerでタップを透過) ---
+            // --- Layer 2: スコア情報 ---
             Positioned(
               top: 10, left: 20, right: 20,
-              child: IgnorePointer(
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "ROUND $_roundCount / $maxRounds",
-                          style: const TextStyle(
-                            color: Colors.amber, 
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
-                          )
-                        ),
-                        Text(
-                          "Total: $_currentScore",
-                          style: const TextStyle(
-                            fontSize: 24, 
-                            fontWeight: FontWeight.w900,
-                            shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
-                          )
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      _lastHitLabel.isEmpty ? "READY" : "HIT: $_lastHitLabel",
-                      style: TextStyle(
-                        fontSize: 32, 
-                        color: _lastHitLabel.contains("OUT") ? Colors.redAccent : Colors.cyanAccent, 
-                        fontWeight: FontWeight.w900, 
-                        letterSpacing: 2.0,
-                        shadows: const [
-                          Shadow(blurRadius: 10.0, color: Colors.black, offset: Offset(0, 0)),
-                          Shadow(blurRadius: 2.0, color: Colors.black, offset: Offset(2, 2))
-                        ]
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
-                        String scoreText = index < _throwScores.length ? "${_throwScores[index]}" : "-";
-                        bool isCurrent = index == _throwScores.length;
-                        
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0), 
-                          child: Container(
-                            width: 44, height: 44, 
-                            decoration: BoxDecoration(
-                              // ★修正: withOpacity -> withValues
-                              color: Colors.black.withValues(alpha: 0.5), 
-                              border: Border.all(
-                                color: isCurrent ? Colors.blueAccent : Colors.white30, 
-                                width: 2
-                              ),
-                              borderRadius: BorderRadius.circular(50),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              scoreText, 
-                              style: const TextStyle(
-                                fontSize: 18, 
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white
-                              )
-                            ),
+              child: AnimatedOpacity(
+                opacity: _isUiVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "ROUND $_roundCount / $maxRounds",
+                            style: const TextStyle(
+                              color: Colors.amber, 
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
+                            )
                           ),
-                        );
-                      }),
-                    ),
-                  ],
+                          Text(
+                            "Total: $_currentScore",
+                            style: const TextStyle(
+                              fontSize: 24, 
+                              fontWeight: FontWeight.w900,
+                              shadows: [Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(2, 2))]
+                            )
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        _lastHitLabel.isEmpty ? "READY" : "HIT: $_lastHitLabel",
+                        style: TextStyle(
+                          fontSize: 32, 
+                          color: _lastHitLabel.contains("OUT") ? Colors.redAccent : Colors.cyanAccent, 
+                          fontWeight: FontWeight.w900, 
+                          letterSpacing: 2.0,
+                          shadows: const [
+                            Shadow(blurRadius: 10.0, color: Colors.black, offset: Offset(0, 0)),
+                            Shadow(blurRadius: 2.0, color: Colors.black, offset: Offset(2, 2))
+                          ]
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          String scoreText = index < _throwScores.length ? "${_throwScores[index]}" : "-";
+                          bool isCurrent = index == _throwScores.length;
+                          
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0), 
+                            child: Container(
+                              width: 44, height: 44, 
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5), 
+                                border: Border.all(
+                                  color: isCurrent ? Colors.blueAccent : Colors.white30, 
+                                  width: 2
+                                ),
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                scoreText, 
+                                style: const TextStyle(
+                                  fontSize: 18, 
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white
+                                )
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -393,22 +433,56 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
             // --- Layer 3: アクションボタン ---
             Positioned(
               bottom: 20, left: 20, right: 20,
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _throwsMm.length == 3 ? _nextRound : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _roundCount == maxRounds ? Colors.redAccent : Colors.blueAccent,
-                    // ★修正: withOpacity -> withValues
-                    disabledBackgroundColor: Colors.grey[800]!.withValues(alpha: 0.8),
-                    elevation: 8,
-                    // ★修正: withOpacity -> withValues
-                    shadowColor: Colors.black.withValues(alpha: 0.5),
-                  ),
-                  child: Text(
-                    _roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", 
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+              child: AnimatedOpacity(
+                opacity: _isUiVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: !_isUiVisible, 
+                  child: Row(
+                    children: [
+                      // ★修正: 1投以上ある時だけUndoボタンを表示
+                      if (_throwsData.isNotEmpty)
+                        SizedBox(
+                          width: 60, height: 50,
+                          child: ElevatedButton(
+                            onPressed: _undo, 
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[800],
+                              padding: EdgeInsets.zero,
+                              elevation: 8,
+                              shadowColor: Colors.black.withValues(alpha: 0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: Colors.white24),
+                              ),
+                            ),
+                            child: const Icon(Icons.undo, color: Colors.white),
+                          ),
+                        ),
+
+                      // NEXT ROUND ボタン (3投完了時のみ出現)
+                      if (_throwsMm.length == 3) ...[
+                        const SizedBox(width: 10), 
+                        Expanded(
+                          child: SizedBox(
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: _nextRound,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _roundCount == maxRounds ? Colors.redAccent : Colors.blueAccent,
+                                disabledBackgroundColor: Colors.grey[800]!.withValues(alpha: 0.8),
+                                elevation: 8,
+                                shadowColor: Colors.black.withValues(alpha: 0.5),
+                              ),
+                              child: Text(
+                                _roundCount == maxRounds ? "SHOW RESULT" : "NEXT ROUND", 
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
