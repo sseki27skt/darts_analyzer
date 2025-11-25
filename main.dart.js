@@ -40472,8 +40472,9 @@ o=A.e7(p.i(q,"score_large"))
 r.z=o==null?2:o
 o=A.e7(p.i(q,"score_area"))
 r.Q=o==null?0:o
+r.a.toString
 s=A.e7(p.i(q,"boundary_type"))
-switch(s==null?0:s){case 0:r.as=340
+switch(s==null?1:s){case 0:r.as=340
 break
 case 1:r.as=198
 break
