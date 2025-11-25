@@ -205,8 +205,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         final pointsToSave = List<ThrowData>.from(_gameHistoryData);
         final scoreToSave = _currentScore;
 
-
-
         Navigator.of(context)
             .push(
               MaterialPageRoute(
@@ -292,8 +290,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _currentScore = 0;
       _roundCount = 1;
       _lastHitLabel = "";
-      visibleDiameterMm = minZoomMm;
-      _baseVisibleDiameter = minZoomMm;
+      visibleDiameterMm = 160.0;
+      _baseVisibleDiameter = 160.0;
       _boardOffset = Offset.zero;
     });
   }
@@ -355,14 +353,16 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                           child: Center(
                             child: Transform.translate(
                               offset: _boardOffset,
-                              child: CustomPaint(
-                                size: Size(availableSize, availableSize),
-                                painter: BoardPainter(
-                                  throwsMm: _throwsMm,
-                                  visibleDiameterMm: visibleDiameterMm,
-                                  ringSizeMm: ringSizeMm,
-                                  ringLargeMm: ringLargeMm,
-                                  showPracticeRings: _scoringMode == 0,
+                              child: RepaintBoundary(
+                                child: CustomPaint(
+                                  size: Size(availableSize, availableSize),
+                                  painter: BoardPainter(
+                                    throwsMm: _throwsMm.toList(),
+                                    visibleDiameterMm: visibleDiameterMm,
+                                    ringSizeMm: ringSizeMm,
+                                    ringLargeMm: ringLargeMm,
+                                    showPracticeRings: _scoringMode == 0,
+                                  ),
                                 ),
                               ),
                             ),
@@ -396,7 +396,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                               color: Colors.amber,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
-                              shadows: [
+                              shadows: kIsWeb ? [] : [
                                 Shadow(
                                   blurRadius: 4.0,
                                   color: Colors.black,
@@ -410,7 +410,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              shadows: [
+                              shadows: kIsWeb ? [] : const [
                                 Shadow(
                                   blurRadius: 4.0,
                                   color: Colors.black,
@@ -431,7 +431,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
                               : Colors.cyanAccent,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 2.0,
-                          shadows: const [
+                          shadows: kIsWeb ? [] : const [
                             Shadow(
                               blurRadius: 10.0,
                               color: Colors.black,

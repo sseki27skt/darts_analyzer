@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // ★追加: kIsWebを使うため
 
 class BoardPainter extends CustomPainter {
   final List<Offset> throwsMm;
@@ -71,15 +72,17 @@ class BoardPainter extends CustomPainter {
           false,
           segmentPaint,
         );
-        _drawBits(
-          canvas,
-          center,
-          angle,
-          segmentAngle,
-          rIn * scalePxPerMm,
-          rOut * scalePxPerMm,
-          color,
-        );
+        if (!kIsWeb) {
+          _drawBits(
+            canvas,
+            center,
+            angle,
+            segmentAngle,
+            rIn * scalePxPerMm,
+            rOut * scalePxPerMm,
+            color,
+          );
+        }
       }
 
       drawSegmentWithBits(rDoubleOut, rDoubleIn, colorRing);
@@ -131,17 +134,20 @@ class BoardPainter extends CustomPainter {
     final Paint fillPaint = Paint()..style = PaintingStyle.fill;
     fillPaint.color = const Color(0xFF661010);
     canvas.drawCircle(center, rBullOut * scalePxPerMm, fillPaint);
-    _drawBitsCircle(
-      canvas,
-      center,
-      rBullIn * scalePxPerMm,
-      rBullOut * scalePxPerMm,
-      const Color(0xFF661010),
-    );
+if (!kIsWeb) {
+      _drawBitsCircle(
+        canvas,
+        center,
+        rBullIn * scalePxPerMm,
+        rBullOut * scalePxPerMm,
+        const Color(0xFF661010),
+      );
+    }
     fillPaint.color = Colors.black;
     canvas.drawCircle(center, rBullIn * scalePxPerMm, fillPaint);
-    _drawBitsCircle(canvas, center, 0, rBullIn * scalePxPerMm, Colors.black);
-    spiderPaint.color = Colors.grey[800]!;
+if (!kIsWeb) {
+      _drawBitsCircle(canvas, center, 0, rBullIn * scalePxPerMm, Colors.black);
+    }    spiderPaint.color = Colors.grey[800]!;
     canvas.drawCircle(center, rBullOut * scalePxPerMm, spiderPaint);
     canvas.drawCircle(center, rBullIn * scalePxPerMm, spiderPaint);
 

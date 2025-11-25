@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'database.dart';
 import 'screens/main_menu_page.dart'; // ★変更: 新しいメニュー画面をインポート
 import 'package:flutter_localizations/flutter_localizations.dart';
-
+import 'package:flutter/gestures.dart';
 void main() {
   // データベースの初期化
   database = AppDatabase();
@@ -25,6 +25,8 @@ class DartsAnalyzerApp extends StatelessWidget {
         // フォントを明示的に指定する場合（オプション）
         // fontFamily: 'Hiragino Kaku Gothic ProN', // Mac/iOS向け
       ),
+
+      scrollBehavior: MyCustomScrollBehavior(),
 
       // ▼▼▼ ② ここから追加 ▼▼▼
 
@@ -50,3 +52,11 @@ class DartsAnalyzerApp extends StatelessWidget {
 }
 
 // ※元の main.dart から PrecisionInputPage クラスの定義は削除済みである前提です。
+class MyCustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse, // これを追加！
+        PointerDeviceKind.trackpad,
+      };
+}

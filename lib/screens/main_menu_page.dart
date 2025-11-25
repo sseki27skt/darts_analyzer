@@ -46,7 +46,7 @@ class GameSelectionPage extends StatelessWidget {
             children: [
               _buildGameButton(
                 context,
-                title: "CENTER COUNT-UP (練習)",
+                title: "CENTER COUNT-UP",
                 subtitle: "ブル集中練習モード。点数配分・リングサイズ調整可能。",
                 destination: const PrecisionInputPage(gameMode: 0),
                 color: Colors.amber,
