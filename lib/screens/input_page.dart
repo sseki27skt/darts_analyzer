@@ -66,6 +66,23 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 1. 通常の保存値を取得 (なければデフォルト 0 を使用)
+    int boundaryType = prefs.getInt('boundary_type') ?? 0;
+
+    // ▼▼▼ 修正ポイント: Center Count-Up (mode 0) の場合は強制的に1にオーバーライド ▼▼▼
+    if (widget.gameMode == 0) {
+      // Center Count-Up (練習モード) で起動した場合は、
+      // ユーザーが設定画面で何を選択していようと、Inside Triple Ring (1) を初期値とする
+      boundaryType = 1;
+      
+      // ★補足: ユーザーが設定画面で変更した場合は、その値がprefsに保存されているため、
+      // 変更を反映させたい場合は、ここでprefs.getInt('boundary_type')を適用するが、
+      // 今回は「Inside Triple Ringが初期設定であるべき」という要望を最優先し、
+      // モード起動時に1を強制します。
+    }
+    // ▲▲▲ 修正ここまで ▲▲▲
+
     setState(() {
       ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
@@ -76,14 +93,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _scoreLarge = prefs.getInt('score_large') ?? 2;
       _scoreArea = prefs.getInt('score_area') ?? 0;
 
-      // ▼▼▼ 修正: デフォルト値の決定ロジックを変更 ▼▼▼
-      // Center Count-Up (mode 0) ならデフォルトは 1 (Inside Triple)
-      // それ以外なら 0 (Full Board)
-      int defaultBoundary = widget.gameMode == 0 ? 1 : 0;
-      int boundaryType = prefs.getInt('boundary_type') ?? defaultBoundary;
-      // ▲▲▲ 修正ここまで ▲▲▲
-
-      switch (boundaryType) {
+      // 修正された boundaryType を使用
+      switch (boundaryType) { 
         case 0:
           _outBoundaryMm = 340.0;
           break;
