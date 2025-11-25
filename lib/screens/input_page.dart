@@ -66,6 +66,18 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
+    int boundaryType;
+
+    // ▼▼▼ 修正: モードごとに読み込むキーとデフォルト値を変える ▼▼▼
+    if (widget.gameMode == 0) {
+      // Center Count-Up (0): 専用キーを使い、デフォルトは 1 (Inside Triple)
+      boundaryType = prefs.getInt('boundary_type_center') ?? 1;
+    } else {
+      // 他のモード: 共通キーを使い、デフォルトは 0 (Full Board)
+      boundaryType = prefs.getInt('boundary_type') ?? 0;
+    }
+    // ▲▲▲ 修正ここまで ▲▲▲
     setState(() {
       ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
@@ -74,7 +86,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _scoreOuter = prefs.getInt('score_outer') ?? 4;
       _scoreSmall = prefs.getInt('score_small') ?? 3;
       _scoreLarge = prefs.getInt('score_large') ?? 2;
-      _scoreArea = prefs.getInt('score_area') ?? 0;
+      _scoreArea = prefs.getInt('score_area') ?? 1;
 
       // 1. SharedPreferencesに保存されている境界値を取得 (なければデフォルトの0)
       int boundaryType = prefs.getInt('boundary_type') ?? 0;

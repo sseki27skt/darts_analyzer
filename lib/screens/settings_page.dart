@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 import '../database.dart';
-import 'package:flutter/foundation.dart'; // これが必要です
+import 'package:flutter/foundation.dart';
 
 class SettingsPage extends StatefulWidget {
   final double currentRingSizeMm;
@@ -25,13 +25,11 @@ class _SettingsPageState extends State<SettingsPage> {
   late double _ringSizeMm;
   late double _ringLargeMm;
 
-  // ★削除: double _ringHalfTripleMm = 107.0;
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
   int _scoreLarge = 2;
-  // ★削除: int _scoreHalfTriple = 1;
-  int _scoreArea = 1; // デフォルト1点
+  int _scoreArea = 1;
   int _boundaryType = 1; // デフォルト: Triple Inner
   int _scoringMode = 0;
 
@@ -48,16 +46,16 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _ringSizeMm = prefs.getDouble('ring_size_mm') ?? 63.0;
       _ringLargeMm = prefs.getDouble('ring_large_mm') ?? 83.0;
-      // ★削除: _ringHalfTripleMm
 
       _scoreInner = prefs.getInt('score_inner') ?? 5;
       _scoreOuter = prefs.getInt('score_outer') ?? 4;
       _scoreSmall = prefs.getInt('score_small') ?? 3;
       _scoreLarge = prefs.getInt('score_large') ?? 2;
-      // ★削除: _scoreHalfTriple
       _scoreArea = prefs.getInt('score_area') ?? 1;
-      _boundaryType = prefs.getInt('boundary_type') ?? 1;
       _scoringMode = prefs.getInt('scoring_mode') ?? 0;
+
+      // ★修正: ここだけにする（重複削除）
+      _boundaryType = prefs.getInt('boundary_type_center') ?? 1;
     });
   }
 
@@ -65,15 +63,17 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('ring_size_mm', _ringSizeMm);
     await prefs.setDouble('ring_large_mm', _ringLargeMm);
-    // ★削除: ring_half_triple_mm
+
+    // ★修正: boundary_type_center だけに保存する
+    await prefs.setInt('boundary_type_center', _boundaryType);
 
     await prefs.setInt('score_inner', _scoreInner);
     await prefs.setInt('score_outer', _scoreOuter);
     await prefs.setInt('score_small', _scoreSmall);
     await prefs.setInt('score_large', _scoreLarge);
-    // ★削除: score_half_triple
+
     await prefs.setInt('score_area', _scoreArea);
-    await prefs.setInt('boundary_type', _boundaryType);
+    // await prefs.setInt('boundary_type', _boundaryType); // ← ★古いキーへの保存は削除！
     await prefs.setInt('scoring_mode', _scoringMode);
 
     if (mounted) {
@@ -85,11 +85,18 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ----------------------------------------
-  // データ管理ロジック
-  // ----------------------------------------
+  // ... (以下のデータ管理ロジックやbuildメソッドはそのまま) ...
+  // _exportData, _importData, _generateDummyData, _clearDatabase など
+  // buildメソッドの中身も変更なし
 
+  // (省略して記述していますが、元のコードの残りの部分をそのまま貼り付けてください)
+  // ...
+
+  // ----------------------------------------
+  // データ管理ロジック (元のコードを維持)
+  // ----------------------------------------
   Future<void> _exportData() async {
+    // ... (元のコード)
     try {
       final allGames = await database.select(database.games).get();
       final allThrows = await database.select(database.throws).get();
@@ -145,6 +152,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _importData() async {
+    // ... (元のコード)
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -244,6 +252,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _generateDummyData() async {
+    // ... (元のコード)
     if (!kDebugMode) return;
     final random = Random();
     final now = DateTime.now();
@@ -347,6 +356,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _clearDatabase() async {
+    // ... (元のコード)
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -386,6 +396,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildScoreInput(String label, int value, Function(int) onChanged) {
+    // ... (元のコード)
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -416,6 +427,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (元のコード: buildメソッド全体)
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: Padding(
@@ -451,8 +463,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   DropdownMenuItem(
                     value: 1,
                     child: Text("Inside Triple Ring (< 198mm)"),
-                  ), // ★修正: 内径
-                  // Half-Triple は削除
+                  ),
                 ],
                 onChanged: (val) => setState(() => _boundaryType = val!),
               ),
@@ -478,7 +489,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 _scoreLarge,
                 (v) => _scoreLarge = v,
               ),
-              // Half-Triple Input は削除
               _buildScoreInput(
                 "Other Valid Area",
                 _scoreArea,
@@ -513,7 +523,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: (val) => setState(() => _ringLargeMm = val),
               ),
 
-              // Half-Triple Slider は削除
               const Divider(height: 40, thickness: 1, color: Colors.white24),
 
               if (!kIsWeb) ...[
@@ -527,7 +536,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
               if (kDebugMode) ...[
-                const SizedBox(height: 10), // 余白も一緒に隠す
+                const SizedBox(height: 10),
 
                 SizedBox(
                   width: double.infinity,
@@ -565,29 +574,29 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ],
                 ),
-              
-              const Text(
-                "※Export: Copy JSON to clipboard.\n※Import: Paste JSON from clipboard.",
-                style: TextStyle(color: Colors.grey, fontSize: 11),
-              ),
+
+                const Text(
+                  "※Export: Copy JSON to clipboard.\n※Import: Paste JSON from clipboard.",
+                  style: TextStyle(color: Colors.grey, fontSize: 11),
+                ),
               ],
 
-if (!kIsWeb) ...[
-              const SizedBox(height: 20),
+              if (!kIsWeb) ...[
+                const SizedBox(height: 20),
 
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.delete_forever),
-                  label: const Text("Reset Database"),
-                  onPressed: _clearDatabase,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text("Reset Database"),
+                    onPressed: _clearDatabase,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
 
               const SizedBox(height: 40),
               SizedBox(
