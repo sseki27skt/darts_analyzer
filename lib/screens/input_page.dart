@@ -8,6 +8,7 @@ import 'result_page.dart';
 import '../utils/score_engine.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart'; // HapticFeedback用
+import 'package:flutter/foundation.dart'; // kIsWeb用
 
 class ThrowData {
   final Offset positionMm;
@@ -49,7 +50,7 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
   String _lastHitLabel = "";
 
   double _baseVisibleDiameter = 160.0;
-  static const double minZoomMm = 160.0;
+  static const double minZoomMm = 40.0;
   static const double maxZoomMm = 400.0;
 
   // ★追加: UIの表示状態
@@ -204,6 +205,8 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
         final pointsToSave = List<ThrowData>.from(_gameHistoryData);
         final scoreToSave = _currentScore;
 
+
+
         Navigator.of(context)
             .push(
               MaterialPageRoute(
@@ -242,6 +245,10 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
     double sdy,
     List<ThrowData> pointsToSave,
   ) async {
+    if (kIsWeb) {
+      print("Web版のため、データベースへの保存をスキップします");
+      return;
+    }
     final gameId = await database
         .into(database.games)
         .insert(

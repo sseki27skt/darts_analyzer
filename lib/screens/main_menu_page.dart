@@ -3,6 +3,7 @@ import 'input_page.dart';
 import 'history_page.dart';
 import 'settings_page.dart';
 import 'zero_one_page.dart'; // ★追加
+import 'package:flutter/foundation.dart'; // これが必要です
 
 class GameSelectionPage extends StatelessWidget {
   const GameSelectionPage({super.key});
@@ -50,6 +51,7 @@ class GameSelectionPage extends StatelessWidget {
                 destination: const PrecisionInputPage(gameMode: 0),
                 color: Colors.amber,
               ),
+              if (!kIsWeb) ...[
               const SizedBox(height: 16),
 
               _buildGameButton(
@@ -72,14 +74,17 @@ class GameSelectionPage extends StatelessWidget {
                 color: Colors.blueAccent,
               ),
 
-              const SizedBox(height: 16),
-              _buildGameButton(
-                context,
-                title: "CRICKET COUNT (今後実装)",
-                subtitle: "クリケットナンバーのグルーピング練習。",
-                destination: null,
-                color: Colors.greenAccent,
-              ),
+              if (kDebugMode) ...[
+                const SizedBox(height: 16), // 余白も隠す
+                _buildGameButton(
+                  context,
+                  title: "CRICKET COUNT (今後実装)",
+                  subtitle: "クリケットナンバーのグルーピング練習。",
+                  destination: null, // 遷移先がないのでnull
+                  color: Colors.greenAccent,
+                ),
+              ],
+              ],
             ],
           ),
         ),
@@ -146,7 +151,7 @@ class GameSelectionPage extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
         ],
-      )
+      ),
     );
   }
 }

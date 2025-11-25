@@ -52,6 +52,7 @@ class _HistoryPageState extends State<HistoryPage> {
     if (!mounted) return;
 
     Navigator.of(context).push(
+      
       MaterialPageRoute(
         builder: (context) => ResultPage(
           gameHistoryMm: points,

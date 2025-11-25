@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drift/drift.dart' as drift; 
-import 'package:flutter/services.dart'; 
+import 'package:drift/drift.dart' as drift;
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 import '../database.dart';
+import 'package:flutter/foundation.dart'; // これが必要です
 
 class SettingsPage extends StatefulWidget {
   final double currentRingSizeMm;
   final double currentRingLargeMm;
 
   const SettingsPage({
-    super.key, 
-    required this.currentRingSizeMm, 
-    required this.currentRingLargeMm, 
+    super.key,
+    required this.currentRingSizeMm,
+    required this.currentRingLargeMm,
   });
 
   @override
@@ -23,8 +24,8 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late double _ringSizeMm;
   late double _ringLargeMm;
-  
-  // ★削除: double _ringHalfTripleMm = 107.0; 
+
+  // ★削除: double _ringHalfTripleMm = 107.0;
   int _scoreInner = 5;
   int _scoreOuter = 4;
   int _scoreSmall = 3;
@@ -32,7 +33,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // ★削除: int _scoreHalfTriple = 1;
   int _scoreArea = 1; // デフォルト1点
   int _boundaryType = 1; // デフォルト: Triple Inner
-  int _scoringMode = 0; 
+  int _scoringMode = 0;
 
   @override
   void initState() {
@@ -55,8 +56,8 @@ class _SettingsPageState extends State<SettingsPage> {
       _scoreLarge = prefs.getInt('score_large') ?? 2;
       // ★削除: _scoreHalfTriple
       _scoreArea = prefs.getInt('score_area') ?? 1;
-      _boundaryType = prefs.getInt('boundary_type') ?? 1; 
-      _scoringMode = prefs.getInt('scoring_mode') ?? 0; 
+      _boundaryType = prefs.getInt('boundary_type') ?? 1;
+      _scoringMode = prefs.getInt('scoring_mode') ?? 0;
     });
   }
 
@@ -73,13 +74,13 @@ class _SettingsPageState extends State<SettingsPage> {
     // ★削除: score_half_triple
     await prefs.setInt('score_area', _scoreArea);
     await prefs.setInt('boundary_type', _boundaryType);
-    await prefs.setInt('scoring_mode', _scoringMode); 
+    await prefs.setInt('scoring_mode', _scoringMode);
 
     if (mounted) {
       Navigator.of(context).pop({
         'ring': _ringSizeMm,
         'ringLarge': _ringLargeMm,
-        'needsReload': true, 
+        'needsReload': true,
       });
     }
   }
@@ -129,12 +130,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Exported ${exportList.length} games to Clipboard!")),
+          SnackBar(
+            content: Text("Exported ${exportList.length} games to Clipboard!"),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Export Failed: $e")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Export Failed: $e")));
       }
     }
   }
@@ -149,10 +154,19 @@ class _SettingsPageState extends State<SettingsPage> {
           style: TextStyle(color: Colors.redAccent),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           TextButton(
-            onPressed: () => Navigator.pop(context, true), 
-            child: const Text("Overwrite", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "Overwrite",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -162,13 +176,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text == null || data!.text!.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Clipboard is empty")));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Clipboard is empty")));
       return;
     }
 
     try {
       final List<dynamic> jsonList = jsonDecode(data.text!);
-      
+
       await database.transaction(() async {
         await database.delete(database.throws).go();
         await database.delete(database.games).go();
@@ -177,54 +194,79 @@ class _SettingsPageState extends State<SettingsPage> {
           final Map<String, dynamic> meta = item['meta'];
           final List<dynamic> points = item['points'];
 
-          final gameId = await database.into(database.games).insert(GamesCompanion.insert(
-            date: DateTime.parse(meta['date']),
-            score: meta['score'],
-            meanX: (meta['meanX'] as num).toDouble(),
-            meanY: (meta['meanY'] as num).toDouble(),
-            sdX: (meta['sdX'] as num).toDouble(),
-            sdY: (meta['sdY'] as num).toDouble(),
-            ringSizeMm: (meta['ringSizeMm'] as num).toDouble(),
-            ringLargeMm: (meta['ringLargeMm'] as num?)?.toDouble() ?? 83.0,
-            gameType: drift.Value(meta['gameType'] as int? ?? 0),
-          ));
+          final gameId = await database
+              .into(database.games)
+              .insert(
+                GamesCompanion.insert(
+                  date: DateTime.parse(meta['date']),
+                  score: meta['score'],
+                  meanX: (meta['meanX'] as num).toDouble(),
+                  meanY: (meta['meanY'] as num).toDouble(),
+                  sdX: (meta['sdX'] as num).toDouble(),
+                  sdY: (meta['sdY'] as num).toDouble(),
+                  ringSizeMm: (meta['ringSizeMm'] as num).toDouble(),
+                  ringLargeMm:
+                      (meta['ringLargeMm'] as num?)?.toDouble() ?? 83.0,
+                  gameType: drift.Value(meta['gameType'] as int? ?? 0),
+                ),
+              );
 
           for (final p in points) {
-            await database.into(database.throws).insert(ThrowsCompanion.insert(
-              gameId: gameId,
-              x: (p['x'] as num).toDouble(),
-              y: (p['y'] as num).toDouble(),
-              orderIndex: p['orderIndex'],
-              segmentLabel: drift.Value(p['segmentLabel'] ?? ''),
-            ));
+            await database
+                .into(database.throws)
+                .insert(
+                  ThrowsCompanion.insert(
+                    gameId: gameId,
+                    x: (p['x'] as num).toDouble(),
+                    y: (p['y'] as num).toDouble(),
+                    orderIndex: p['orderIndex'],
+                    segmentLabel: drift.Value(p['segmentLabel'] ?? ''),
+                  ),
+                );
           }
         }
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Import Successful! Please restart app.")),
+          const SnackBar(
+            content: Text("Import Successful! Please restart app."),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Import Failed: $e")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Import Failed: $e")));
       }
     }
   }
 
   Future<void> _generateDummyData() async {
+    if (!kDebugMode) return;
     final random = Random();
     final now = DateTime.now();
-    
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Generate Dummy Data"),
-        content: const Text("This will add 30 fake game records with plots.\nAre you sure?"),
+        content: const Text(
+          "This will add 30 fake game records with plots.\nAre you sure?",
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Generate", style: TextStyle(color: Colors.orangeAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "Generate",
+              style: TextStyle(color: Colors.orangeAccent),
+            ),
+          ),
         ],
       ),
     );
@@ -236,15 +278,15 @@ class _SettingsPageState extends State<SettingsPage> {
         final date = now.subtract(Duration(days: i, hours: random.nextInt(12)));
         final score = 40 + random.nextInt(61);
         final spread = 40.0 - (i * 0.8);
-        
+
         final List<Offset> dummyPoints = [];
         double sumX = 0, sumY = 0;
-        for(int j=0; j<3; j++) {
+        for (int j = 0; j < 3; j++) {
           double u = 0, v = 0;
-          while(u == 0) {
+          while (u == 0) {
             u = random.nextDouble();
-          } 
-          while(v == 0) {
+          }
+          while (v == 0) {
             v = random.nextDouble();
           }
           double mag = sqrt(-2.0 * log(u)) * (spread / 2);
@@ -254,43 +296,53 @@ class _SettingsPageState extends State<SettingsPage> {
           sumX += x;
           sumY += y;
         }
-        
+
         double meanX = sumX / 3;
         double meanY = sumY / 3;
         double sumSqX = 0, sumSqY = 0;
-        for(var p in dummyPoints) {
+        for (var p in dummyPoints) {
           sumSqX += pow(p.dx - meanX, 2);
           sumSqY += pow(p.dy - meanY, 2);
         }
         double sdX = sqrt(sumSqX / 3);
         double sdY = sqrt(sumSqY / 3);
 
-        final gameId = await database.into(database.games).insert(GamesCompanion.insert(
-          date: date,
-          score: score,
-          meanX: meanX,
-          meanY: meanY,
-          sdX: sdX,
-          sdY: sdY,
-          ringSizeMm: _ringSizeMm,
-          ringLargeMm: _ringLargeMm,
-          gameType: drift.Value(0), // Center mode
-        ));
+        final gameId = await database
+            .into(database.games)
+            .insert(
+              GamesCompanion.insert(
+                date: date,
+                score: score,
+                meanX: meanX,
+                meanY: meanY,
+                sdX: sdX,
+                sdY: sdY,
+                ringSizeMm: _ringSizeMm,
+                ringLargeMm: _ringLargeMm,
+                gameType: drift.Value(0), // Center mode
+              ),
+            );
 
-        for(int j=0; j<3; j++) {
-           await database.into(database.throws).insert(ThrowsCompanion.insert(
-            gameId: gameId,
-            x: dummyPoints[j].dx,
-            y: dummyPoints[j].dy,
-            orderIndex: j,
-            segmentLabel: drift.Value("DEBUG"), 
-          ));
+        for (int j = 0; j < 3; j++) {
+          await database
+              .into(database.throws)
+              .insert(
+                ThrowsCompanion.insert(
+                  gameId: gameId,
+                  x: dummyPoints[j].dx,
+                  y: dummyPoints[j].dy,
+                  orderIndex: j,
+                  segmentLabel: drift.Value("DEBUG"),
+                ),
+              );
         }
       }
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Generated 30 dummy records!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Generated 30 dummy records!")),
+      );
     }
   }
 
@@ -299,10 +351,22 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Reset Database"),
-        content: const Text("DELETE ALL DATA. Are you sure?", style: TextStyle(color: Colors.redAccent)),
+        content: const Text(
+          "DELETE ALL DATA. Are you sure?",
+          style: TextStyle(color: Colors.redAccent),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("DELETE ALL", style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "DELETE ALL",
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
         ],
       ),
     );
@@ -315,10 +379,12 @@ class _SettingsPageState extends State<SettingsPage> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Database Cleared!")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Database Cleared!")));
     }
   }
-  
+
   Widget _buildScoreInput(String label, int value, Function(int) onChanged) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -326,9 +392,22 @@ class _SettingsPageState extends State<SettingsPage> {
         Text(label),
         Row(
           children: [
-            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () { if (value > 0) setState(() => onChanged(value - 1)); }),
-            Text("$value", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () { if (value < 100) setState(() => onChanged(value + 1)); }),
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              onPressed: () {
+                if (value > 0) setState(() => onChanged(value - 1));
+              },
+            ),
+            Text(
+              "$value",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () {
+                if (value < 100) setState(() => onChanged(value + 1));
+              },
+            ),
           ],
         ),
       ],
@@ -345,68 +424,155 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Scoring Rules (Center Mode)", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber)),
+              const Text(
+                "Scoring Rules (Center Mode)",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
+              ),
               const SizedBox(height: 10),
 
               // --- Boundary Setting ---
-              const Text("Valid Board Area (Out Boundary)", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                "Valid Board Area (Out Boundary)",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               DropdownButton<int>(
                 value: _boundaryType,
                 isExpanded: true,
                 dropdownColor: Colors.grey[800],
                 items: const [
-                  DropdownMenuItem(value: 0, child: Text("Outside Double Ring (> 340mm)")),
-                  DropdownMenuItem(value: 1, child: Text("Inside Triple Ring (< 198mm)")), // ★修正: 内径
+                  DropdownMenuItem(
+                    value: 0,
+                    child: Text("Outside Double Ring (> 340mm)"),
+                  ),
+                  DropdownMenuItem(
+                    value: 1,
+                    child: Text("Inside Triple Ring (< 198mm)"),
+                  ), // ★修正: 内径
                   // Half-Triple は削除
                 ],
                 onChanged: (val) => setState(() => _boundaryType = val!),
               ),
               const SizedBox(height: 20),
-              
-              _buildScoreInput("Inner Bull (< 8mm)", _scoreInner, (v) => _scoreInner = v),
-              _buildScoreInput("Outer Bull (< 22mm)", _scoreOuter, (v) => _scoreOuter = v),
-              _buildScoreInput("Small Ring", _scoreSmall, (v) => _scoreSmall = v),
-              _buildScoreInput("Large Ring", _scoreLarge, (v) => _scoreLarge = v),
+
+              _buildScoreInput(
+                "Inner Bull (< 8mm)",
+                _scoreInner,
+                (v) => _scoreInner = v,
+              ),
+              _buildScoreInput(
+                "Outer Bull (< 22mm)",
+                _scoreOuter,
+                (v) => _scoreOuter = v,
+              ),
+              _buildScoreInput(
+                "Small Ring",
+                _scoreSmall,
+                (v) => _scoreSmall = v,
+              ),
+              _buildScoreInput(
+                "Large Ring",
+                _scoreLarge,
+                (v) => _scoreLarge = v,
+              ),
               // Half-Triple Input は削除
-              _buildScoreInput("Other Valid Area", _scoreArea, (v) => _scoreArea = v),
+              _buildScoreInput(
+                "Other Valid Area",
+                _scoreArea,
+                (v) => _scoreArea = v,
+              ),
 
               const Divider(height: 40, thickness: 1, color: Colors.white24),
 
-              const Text("Calibration", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text(
+                "Calibration",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 20),
-              
+
               Text("Small Ring: ${_ringSizeMm.toStringAsFixed(1)} mm"),
-              Slider(value: _ringSizeMm, min: 20.0, max: 100.0, divisions: 80, label: "${_ringSizeMm.toStringAsFixed(1)} mm", onChanged: (val) => setState(() => _ringSizeMm = val)),
-              
+              Slider(
+                value: _ringSizeMm,
+                min: 20.0,
+                max: 100.0,
+                divisions: 80,
+                label: "${_ringSizeMm.toStringAsFixed(1)} mm",
+                onChanged: (val) => setState(() => _ringSizeMm = val),
+              ),
+
               Text("Large Ring: ${_ringLargeMm.toStringAsFixed(1)} mm"),
-              Slider(value: _ringLargeMm, min: 40.0, max: 200.0, divisions: 160, label: "${_ringLargeMm.toStringAsFixed(1)} mm", onChanged: (val) => setState(() => _ringLargeMm = val)),
+              Slider(
+                value: _ringLargeMm,
+                min: 40.0,
+                max: 200.0,
+                divisions: 160,
+                label: "${_ringLargeMm.toStringAsFixed(1)} mm",
+                onChanged: (val) => setState(() => _ringLargeMm = val),
+              ),
 
               // Half-Triple Slider は削除
-              
               const Divider(height: 40, thickness: 1, color: Colors.white24),
 
-              const Text("Data Management", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-              const SizedBox(height: 10),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.science),
-                  label: const Text("Generate Dummy Data (Debug)"),
-                  onPressed: _generateDummyData,
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.orangeAccent),
+              if (!kIsWeb) ...[
+                const Text(
+                  "Data Management",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.cyanAccent,
+                  ),
                 ),
-              ),
+              ],
+              if (kDebugMode) ...[
+                const SizedBox(height: 10), // 余白も一緒に隠す
 
-              Row(
-                children: [
-                  Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.copy), label: const Text("Export DB"), onPressed: _exportData)),
-                  const SizedBox(width: 10),
-                  Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.paste), label: const Text("Import DB"), onPressed: _importData, style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent))),
-                ],
-              ),
-              const Text("※Export: Copy JSON to clipboard.\n※Import: Paste JSON from clipboard.", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.science),
+                    label: const Text("Generate Dummy Data (Debug)"),
+                    onPressed: _generateDummyData,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orangeAccent,
+                    ),
+                  ),
+                ),
+              ],
 
+              if (!kIsWeb) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.copy),
+                        label: const Text("Export DB"),
+                        onPressed: _exportData,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.paste),
+                        label: const Text("Import DB"),
+                        onPressed: _importData,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              
+              const Text(
+                "※Export: Copy JSON to clipboard.\n※Import: Paste JSON from clipboard.",
+                style: TextStyle(color: Colors.grey, fontSize: 11),
+              ),
+              ],
+
+if (!kIsWeb) ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -415,18 +581,25 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: const Icon(Icons.delete_forever),
                   label: const Text("Reset Database"),
                   onPressed: _clearDatabase,
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent),
+                  ),
                 ),
               ),
+            ],
 
               const SizedBox(height: 40),
               SizedBox(
-                width: double.infinity, height: 50,
+                width: double.infinity,
+                height: 50,
                 child: ElevatedButton.icon(
                   onPressed: _saveSettings,
                   icon: const Icon(Icons.save),
                   label: const Text("SAVE & CLOSE"),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
                 ),
               ),
               const SizedBox(height: 40),
