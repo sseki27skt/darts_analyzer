@@ -83,7 +83,6 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       int boundaryType = prefs.getInt('boundary_type') ?? defaultBoundary;
       // ▲▲▲ 修正ここまで ▲▲▲
 
-      int boundaryType = prefs.getInt('boundary_type') ?? 0;
       switch (boundaryType) {
         case 0:
           _outBoundaryMm = 340.0;
