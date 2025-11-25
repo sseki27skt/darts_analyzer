@@ -76,6 +76,13 @@ class _PrecisionInputPageState extends State<PrecisionInputPage> {
       _scoreLarge = prefs.getInt('score_large') ?? 2;
       _scoreArea = prefs.getInt('score_area') ?? 0;
 
+      // ▼▼▼ 修正: デフォルト値の決定ロジックを変更 ▼▼▼
+      // Center Count-Up (mode 0) ならデフォルトは 1 (Inside Triple)
+      // それ以外なら 0 (Full Board)
+      int defaultBoundary = widget.gameMode == 0 ? 1 : 0;
+      int boundaryType = prefs.getInt('boundary_type') ?? defaultBoundary;
+      // ▲▲▲ 修正ここまで ▲▲▲
+
       int boundaryType = prefs.getInt('boundary_type') ?? 0;
       switch (boundaryType) {
         case 0:
